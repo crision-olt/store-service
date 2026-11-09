@@ -9,7 +9,7 @@ Required environment variables (see `.env.example` for template):
 - `PORT` - Server port (default: 3001)
 - `NODE_ENV` - Set to 'production' for production builds
 - `JWT_EXPIRE` - Token expiry time (default: '7d')
-- `AUTH_SERVICE_URL` - URL of this service (for CORS)
+- `AUTH_FRONTEND_URL` - URL of this service (for CORS)
 - `DEMO_APP_URL` - URL of demo app (for CORS)
 
 ## Building and Running
