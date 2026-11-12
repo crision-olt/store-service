@@ -8,7 +8,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: [process.env.AUTH_FRONTEND_URL],
+  origin: [process.env.AUTH_FRONTEND_URL, process.env.DEMO_FRONTEND_URL],
   credentials: true
 }));
 app.use(cookieParser());
