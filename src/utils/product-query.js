@@ -2,6 +2,13 @@ const SORTABLE_COLUMNS = ['id', 'name', 'sku', 'category', 'subcategory', 'price
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PRICE = 99999999.99;
+const MAX_ID = 2147483647;
+const PRODUCT_COLUMNS = `id, name, description, sku,
+  category_id AS "categoryId",
+  (SELECT name FROM categories WHERE id = products.category_id) AS "categoryName",
+  subcategory_id AS "subcategoryId",
+  (SELECT name FROM subcategories WHERE id = products.subcategory_id) AS "subcategoryName",
+  price, stock, created_at`;
 
 const LIST_PARAMS = [
   'search', 'category', 'subcategory', 'minPrice', 'maxPrice', 'inStock', 'sortBy', 'sortOrder', 'page', 'pageSize'
@@ -56,14 +63,13 @@ const parseListQuery = (query = {}) => {
     filters.search = search.trim();
   }
 
-  const category = first(query.category);
-  if (category !== undefined && category.trim() !== '') {
-    filters.category = category.trim();
-  }
-
-  const subcategory = first(query.subcategory);
-  if (subcategory !== undefined && subcategory.trim() !== '') {
-    filters.subcategory = subcategory.trim();
+  for (const name of ['category', 'subcategory']) {
+    const raw = first(query[name]);
+    if (raw === undefined || raw === '') continue;
+    if (!/^[1-9]\d*$/.test(raw)) return { error: `${name} must be a positive integer ID` };
+    const parsed = parseInteger(raw, name, { min: 1, max: MAX_ID });
+    if (parsed.error) return { error: parsed.error };
+    filters[name] = parsed.value;
   }
 
   for (const name of ['minPrice', 'maxPrice']) {
@@ -137,8 +143,8 @@ const buildListQuery = (filters) => {
       `(name ILIKE ${placeholder} OR sku ILIKE ${placeholder} OR description ILIKE ${placeholder})`
     );
   }
-  if (filters.category) conditions.push(`category = ${param(filters.category)}`);
-  if (filters.subcategory) conditions.push(`subcategory = ${param(filters.subcategory)}`);
+  if (filters.category) conditions.push(`category_id = ${param(filters.category)}`);
+  if (filters.subcategory) conditions.push(`subcategory_id = ${param(filters.subcategory)}`);
   if (filters.minPrice !== undefined) conditions.push(`price >= ${param(filters.minPrice)}`);
   if (filters.maxPrice !== undefined) conditions.push(`price <= ${param(filters.maxPrice)}`);
   if (filters.inStock === true) conditions.push('stock > 0');
@@ -146,7 +152,11 @@ const buildListQuery = (filters) => {
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const direction = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';
-  const sortColumn = SORTABLE_COLUMNS.includes(filters.sortBy) ? filters.sortBy : 'created_at';
+  const sortColumn = filters.sortBy === 'category'
+    ? '(SELECT name FROM categories WHERE id = products.category_id)'
+    : filters.sortBy === 'subcategory'
+      ? '(SELECT name FROM subcategories WHERE id = products.subcategory_id)'
+      : SORTABLE_COLUMNS.includes(filters.sortBy) ? filters.sortBy : 'created_at';
 
   const countValues = [...values];
   const limit = param(filters.pageSize);
@@ -156,7 +166,7 @@ const buildListQuery = (filters) => {
     count: { text: `SELECT COUNT(*)::int AS total FROM products ${where}`, values: countValues },
     rows: {
       text:
-        `SELECT id, name, description, sku, category, subcategory, price, stock, created_at FROM products ${where} ` +
+        `SELECT ${PRODUCT_COLUMNS} FROM products ${where} ` +
         `ORDER BY ${sortColumn} ${direction}, id ${direction} LIMIT ${limit} OFFSET ${offset}`,
       values
     }
@@ -179,19 +189,21 @@ const parseProductInput = (body) => {
   };
 
   const product = {};
-  for (const [field, maxLength] of [['name', 255], ['sku', 64], ['category', 100]]) {
+  for (const [field, maxLength] of [['name', 255], ['sku', 64]]) {
     const result = requiredText(field, maxLength);
     if (result.error) return { error: result.error };
     product[field] = result.value;
   }
 
-  const { subcategory } = body;
-  if (subcategory === undefined || subcategory === null || subcategory === '') {
-    product.subcategory = null;
-  } else if (typeof subcategory !== 'string' || subcategory.trim() === '' || subcategory.trim().length > 100) {
-    return { error: 'subcategory must be a non-empty string of at most 100 characters' };
-  } else {
-    product.subcategory = subcategory.trim();
+  for (const field of ['categoryId', 'subcategoryId']) {
+    const value = body[field];
+    if (field === 'subcategoryId' && (value === undefined || value === null)) {
+      product[field] = null;
+    } else if (!Number.isInteger(value) || value < 1 || value > MAX_ID) {
+      return { error: `${field} must be a positive integer ID` };
+    } else {
+      product[field] = value;
+    }
   }
 
   const { description } = body;
@@ -223,6 +235,7 @@ const parseProductInput = (body) => {
 
 module.exports = {
   SORTABLE_COLUMNS,
+  PRODUCT_COLUMNS,
   parseListQuery,
   buildListQuery,
   parseProductInput
