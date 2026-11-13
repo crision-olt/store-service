@@ -13,7 +13,7 @@ Centralized authentication microservice for SSO across multiple applications.
    Run these scripts once on a new database.
    ```bash
    createdb auth_sso
-   psql auth_sso < sql/init.sql
+   psql -v ON_ERROR_STOP=1 auth_sso -f sql/init.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/products.sql
    ```
 
@@ -36,6 +36,36 @@ Service will run on http://localhost:3000
 - `POST /auth/login` - Login user
 - `GET /auth/me` - Get current user (requires valid JWT cookie)
 - `POST /auth/logout` - Logout user
+
+### Roles and permissions
+
+Each user has exactly one role. Registration always assigns the seeded `user` role,
+which has no permissions; request bodies cannot select a role. The seeded `admin` role
+has the `access:manage` permission.
+
+To bootstrap administration, a database administrator must assign the `admin` role to
+a trusted registered account using a controlled database connection. For example:
+
+```sql
+UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin')
+WHERE email = 'trusted-admin@example.com';
+```
+
+The following endpoints require a valid JWT cookie and the `access:manage` permission.
+Permissions are checked from the database on each request; assigning a permission does
+not automatically protect other endpoints.
+
+- `POST /permissions` - Create a permission with `{ "name": "products:read" }`; returns `{ id, name }`.
+- `GET /permissions` - List permissions as `{ id, name }` objects.
+- `POST /roles` - Create a role with `{ "name": "reader", "permissionIds": [2, 3] }`.
+  The IDs must exist and be distinct; an empty array creates a role without permissions.
+  Returns `{ id, name, permissions }`, where `permissions` contains `{ id, name }` objects.
+- `GET /roles` - List roles and their permissions.
+
+Duplicate names return `409`; invalid input or nonexistent permission IDs return `400`.
+An unauthenticated request returns `401`, and a user without `access:manage` receives
+`403`. Look up permission IDs before assigning them: `access:manage` grants control
+over these endpoints. There is no API for changing a user's role.
 
 ### Products (all require a valid JWT cookie)
 

@@ -22,6 +22,8 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/auth', require('./routes/auth'));
 app.use('/products', require('./routes/products'));
+app.use('/roles', require('./routes/roles'));
+app.use('/permissions', require('./routes/permissions'));
 
 // Error handling
 app.use((err, req, res, next) => {
