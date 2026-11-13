@@ -10,6 +10,7 @@ Centralized authentication microservice for SSO across multiple applications.
    ```
 
 2. **Setup PostgreSQL:**
+   Run these scripts once on a new database.
    ```bash
    createdb auth_sso
    psql auth_sso < sql/init.sql
@@ -56,20 +57,11 @@ Service will run on http://localhost:3000
 - Creating duplicate category names, or duplicate subcategory names within the same category, returns `409`. A nonexistent parent category returns `400`.
 - `GET /products/:id` - Get a product by id (`404` if missing)
 
-### Upgrading an existing product database
-
-Back up the database before upgrading. Run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/products.sql`
-before deploying the updated service and frontend. The transaction creates categories and
-subcategories from the existing product names, then replaces the text columns with foreign
-keys. Subcategories with the same name under different categories remain distinct. The script
-can also be rerun on an upgraded database. Product category filters and creation requests now
-use IDs rather than names, so older API clients must be updated.
-
 ## Tests
 
 ```bash
 npm test
 ```
 
-Migration tests use an isolated in-memory PostgreSQL engine; they do not connect to
+Schema tests use an isolated in-memory PostgreSQL engine; they do not connect to
 the configured database.
