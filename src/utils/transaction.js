@@ -1,7 +1,6 @@
 const pool = require('../config/database');
-const { AccessError } = require('./access-error');
 
-// Serializes every transaction that can change who holds access:manage.
+// Serializes transactions that change roles or user-role assignments.
 const ACCESS_LOCK_ID = 7301;
 
 const withAccessTransaction = async (work) => {
@@ -20,18 +19,4 @@ const withAccessTransaction = async (work) => {
   }
 };
 
-const assertAccessManagerRemains = async (client) => {
-  const { rows } = await client.query(
-    `SELECT EXISTS (
-      SELECT 1 FROM users u
-      JOIN role_permissions rp ON rp.role_id = u.role_id
-      JOIN permissions p ON p.id = rp.permission_id
-      WHERE p.name = 'access:manage'
-    ) AS present`
-  );
-  if (!rows[0].present) {
-    throw new AccessError(409, 'At least one user must keep the access:manage permission');
-  }
-};
-
-module.exports = { withAccessTransaction, assertAccessManagerRemains };
+module.exports = { withAccessTransaction };

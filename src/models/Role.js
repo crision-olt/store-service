@@ -1,6 +1,6 @@
 const pool = require('../config/database');
 const { AccessError } = require('../utils/access-error');
-const { withAccessTransaction, assertAccessManagerRemains } = require('../utils/transaction');
+const { withAccessTransaction } = require('../utils/transaction');
 
 const PROTECTED_ROLE = 'user';
 
@@ -63,7 +63,6 @@ class Role {
          SELECT $1, requested.id FROM unnest($2::integer[]) AS requested(id)`,
         [id, permissionIds]
       );
-      await assertAccessManagerRemains(client);
       return (await selectRoles(client, id)).rows[0];
     });
   }

@@ -7,7 +7,7 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const { PGlite } = require('@electric-sql/pglite');
 
-test('manages roles, permissions and user roles without losing the last access manager', async (t) => {
+test('manages roles, permissions and user roles', async (t) => {
   process.env.JWT_SECRET = 'test-secret';
   const db = new PGlite();
   t.after(() => db.close());
@@ -66,7 +66,6 @@ test('manages roles, permissions and user roles without losing the last access m
   assert.equal((await call('PUT', `/roles/${role.id}`, { name: 'admin', permissionIds: [] })).status, 409);
   assert.equal((await call('PUT', `/roles/${role.id}`, { name: 'viewer', permissionIds: [999] })).status, 400);
   assert.equal((await call('PUT', '/roles/999', { name: 'x', permissionIds: [] })).status, 404);
-  assert.equal((await call('PUT', '/roles/2', { name: 'admin', permissionIds: [] })).status, 409);
   assert.equal((await call('PUT', '/roles/1', { name: 'guest', permissionIds: [] })).status, 409);
 
   assert.deepEqual((await call('GET', '/users')).body, [
@@ -78,8 +77,6 @@ test('manages roles, permissions and user roles without losing the last access m
   assert.equal((await call('PUT', '/users/2/role', { roleId: 999 })).status, 400);
   assert.equal((await call('PUT', '/users/999/role', { roleId: 1 })).status, 404);
   assert.equal((await call('PUT', '/users/2/role', { roleId: '1' })).status, 400);
-  assert.equal((await call('PUT', '/users/1/role', { roleId: 1 })).status, 409);
-  assert.equal((await call('GET', '/users')).body[0].role.name, 'admin');
 
   assert.equal((await call('DELETE', `/roles/${role.id}`)).status, 409);
   assert.equal((await call('DELETE', '/roles/1')).status, 409);

@@ -69,8 +69,7 @@ not automatically protect other endpoints.
 - `PUT /users/:id/role` - Assign a role to a user with `{ "roleId": 2 }`.
 
 Protections (all return `409`): the `access:manage` permission and the `user` role
-(used by registration) cannot be renamed or deleted, and no change may leave zero users
-holding `access:manage`. Unknown IDs return `404`.
+(used by registration) cannot be renamed or deleted. Unknown IDs return `404`.
 
 Duplicate names return `409`; invalid input or nonexistent permission or role IDs return `400`.
 An unauthenticated request returns `401`, and a user without `access:manage` receives
