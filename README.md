@@ -41,7 +41,9 @@ Service will run on http://localhost:3000
 
 Each user has exactly one role. Registration always assigns the seeded `user` role,
 which has no permissions; request bodies cannot select a role. The seeded `admin` role
-has the `access:manage` permission.
+has every seeded permission: `read`, `create`, `edit` and `delete` for `products`,
+`categories`, `roles` and `users` (for example `products:read`). They are seed data
+only; no endpoint checks them.
 
 To bootstrap administration (the first admin; later changes go through `PUT /users/:id/role`), a database administrator must assign the `admin` role to
 a trusted registered account using a controlled database connection. For example:

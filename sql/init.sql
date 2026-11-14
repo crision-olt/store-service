@@ -16,11 +16,27 @@ CREATE TABLE role_permissions (
   PRIMARY KEY (role_id, permission_id)
 );
 
-INSERT INTO roles (name) VALUES ('user'), ('admin');
-INSERT INTO permissions (name) VALUES ('access:manage');
+INSERT INTO roles (name) VALUES ('admin');
+INSERT INTO permissions (name) VALUES
+  ('products:read'),
+  ('products:create'),
+  ('products:edit'),
+  ('products:delete'),
+  ('categories:read'),
+  ('categories:create'),
+  ('categories:edit'),
+  ('categories:delete'),
+  ('roles:read'),
+  ('roles:create'),
+  ('roles:edit'),
+  ('roles:delete'),
+  ('users:read'),
+  ('users:create'),
+  ('users:edit'),
+  ('users:delete');
 INSERT INTO role_permissions (role_id, permission_id)
   SELECT roles.id, permissions.id FROM roles, permissions
-  WHERE roles.name = 'admin' AND permissions.name = 'access:manage';
+  WHERE roles.name = 'admin';
 
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
