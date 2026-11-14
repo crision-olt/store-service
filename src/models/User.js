@@ -1,5 +1,15 @@
 const pool = require('../config/database');
 const bcrypt = require('bcrypt');
+const { AccessError } = require('../utils/access-error');
+const { withAccessTransaction, assertAccessManagerRemains } = require('../utils/transaction');
+
+const selectUsers = (client, id) => client.query(
+  `SELECT u.id, u.email, json_build_object('id', r.id, 'name', r.name) AS role
+   FROM users u JOIN roles r ON r.id = u.role_id
+   WHERE $1::integer IS NULL OR u.id = $1
+   ORDER BY u.email, u.id`,
+  [id ?? null]
+);
 
 class User {
   static async create(email, password) {
@@ -27,6 +37,20 @@ class User {
       [id]
     );
     return result.rows[0];
+  }
+
+  static async findAllWithRoles() {
+    const result = await selectUsers(pool);
+    return result.rows;
+  }
+
+  static async updateRole(id, roleId) {
+    return withAccessTransaction(async (client) => {
+      const result = await client.query('UPDATE users SET role_id = $2 WHERE id = $1', [id, roleId]);
+      if (result.rowCount === 0) throw new AccessError(404, 'User not found');
+      await assertAccessManagerRemains(client);
+      return (await selectUsers(client, id)).rows[0];
+    });
   }
 
   static async validatePassword(plainPassword, hashedPassword) {

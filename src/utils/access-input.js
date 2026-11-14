@@ -14,4 +14,17 @@ const parsePermissionIds = (value) => {
   return { permissionIds: value };
 };
 
-module.exports = { parseName, parsePermissionIds };
+const parseId = (value) => {
+  const id = Number(value);
+  return /^\d+$/.test(String(value)) && id >= 1 && id <= 2147483647 ? id : null;
+};
+
+const parseRoleId = (body) => {
+  const roleId = body && typeof body === 'object' ? body.roleId : undefined;
+  if (!Number.isInteger(roleId) || roleId < 1 || roleId > 2147483647) {
+    return { error: 'roleId must be a positive integer ID' };
+  }
+  return { roleId };
+};
+
+module.exports = { parseName, parsePermissionIds, parseId, parseRoleId };

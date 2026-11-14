@@ -43,7 +43,7 @@ Each user has exactly one role. Registration always assigns the seeded `user` ro
 which has no permissions; request bodies cannot select a role. The seeded `admin` role
 has the `access:manage` permission.
 
-To bootstrap administration, a database administrator must assign the `admin` role to
+To bootstrap administration (the first admin; later changes go through `PUT /users/:id/role`), a database administrator must assign the `admin` role to
 a trusted registered account using a controlled database connection. For example:
 
 ```sql
@@ -61,11 +61,21 @@ not automatically protect other endpoints.
   The IDs must exist and be distinct; an empty array creates a role without permissions.
   Returns `{ id, name, permissions }`, where `permissions` contains `{ id, name }` objects.
 - `GET /roles` - List roles and their permissions.
+- `PUT /permissions/:id` - Rename a permission with `{ "name": "products:edit" }`.
+- `DELETE /permissions/:id` - Delete a permission that no role uses (`204`).
+- `PUT /roles/:id` - Replace a role's name and permissions with `{ "name", "permissionIds" }`.
+- `DELETE /roles/:id` - Delete a role that no user has (`204`).
+- `GET /users` - List users as `{ id, email, role: { id, name } }`.
+- `PUT /users/:id/role` - Assign a role to a user with `{ "roleId": 2 }`.
 
-Duplicate names return `409`; invalid input or nonexistent permission IDs return `400`.
+Protections (all return `409`): the `access:manage` permission and the `user` role
+(used by registration) cannot be renamed or deleted, and no change may leave zero users
+holding `access:manage`. Unknown IDs return `404`.
+
+Duplicate names return `409`; invalid input or nonexistent permission or role IDs return `400`.
 An unauthenticated request returns `401`, and a user without `access:manage` receives
 `403`. Look up permission IDs before assigning them: `access:manage` grants control
-over these endpoints. There is no API for changing a user's role.
+over these endpoints.
 
 ### Products (all require a valid JWT cookie)
 
