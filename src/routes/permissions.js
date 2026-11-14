@@ -1,12 +1,11 @@
 const express = require('express');
 const Permission = require('../models/Permission');
 const { authenticateToken } = require('../middleware/auth');
-const { requirePermission } = require('../middleware/permission');
 const { parseName, parseId } = require('../utils/access-input');
 const { AccessError } = require('../utils/access-error');
 
 const router = express.Router();
-router.use(authenticateToken, requirePermission('access:manage'));
+router.use(authenticateToken);
 
 router.post('/', async (req, res) => {
   const { name, error } = parseName(req.body);

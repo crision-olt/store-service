@@ -1,12 +1,11 @@
 const express = require('express');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
-const { requirePermission } = require('../middleware/permission');
 const { parseId, parseRoleId } = require('../utils/access-input');
 const { AccessError } = require('../utils/access-error');
 
 const router = express.Router();
-router.use(authenticateToken, requirePermission('access:manage'));
+router.use(authenticateToken);
 
 router.get('/', async (req, res) => {
   try {

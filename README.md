@@ -51,9 +51,8 @@ UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin')
 WHERE email = 'trusted-admin@example.com';
 ```
 
-The following endpoints require a valid JWT cookie and the `access:manage` permission.
-Permissions are checked from the database on each request; assigning a permission does
-not automatically protect other endpoints.
+The following endpoints require a valid JWT cookie. No role or permission is checked:
+any authenticated user can call them.
 
 - `POST /permissions` - Create a permission with `{ "name": "products:read" }`; returns `{ id, name }`.
 - `GET /permissions` - List permissions as `{ id, name }` objects.
@@ -68,13 +67,11 @@ not automatically protect other endpoints.
 - `GET /users` - List users as `{ id, email, role: { id, name } }`.
 - `PUT /users/:id/role` - Assign a role to a user with `{ "roleId": 2 }`.
 
-Protections (all return `409`): the `access:manage` permission and the `user` role
-(used by registration) cannot be renamed or deleted. Unknown IDs return `404`.
+Protection (returns `409`): the `user` role (used by registration) cannot be renamed
+or deleted. Unknown IDs return `404`.
 
 Duplicate names return `409`; invalid input or nonexistent permission or role IDs return `400`.
-An unauthenticated request returns `401`, and a user without `access:manage` receives
-`403`. Look up permission IDs before assigning them: `access:manage` grants control
-over these endpoints.
+An unauthenticated request returns `401`. Look up permission IDs before assigning them.
 
 ### Products (all require a valid JWT cookie)
 
