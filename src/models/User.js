@@ -3,7 +3,8 @@ const bcrypt = require('bcrypt');
 const { AccessError } = require('../utils/access-error');
 
 const selectUsers = (client, id) => client.query(
-  `SELECT u.id, u.email, u.created_at, json_build_object('id', r.id, 'name', r.name) AS role
+  `SELECT u.id, u.email, u.created_at, (u.blocked_at IS NOT NULL) AS blocked,
+          json_build_object('id', r.id, 'name', r.name) AS role
    FROM users u JOIN roles r ON r.id = u.role_id
    WHERE $1::integer IS NULL OR u.id = $1
    ORDER BY u.email, u.id`,
@@ -33,7 +34,7 @@ class User {
 
   static async findByEmail(email) {
     const result = await pool.query(
-      'SELECT id, email, password, created_at FROM users WHERE email = $1',
+      'SELECT id, email, password, created_at, blocked_at FROM users WHERE email = $1',
       [email]
     );
     return result.rows[0];
@@ -45,6 +46,22 @@ class User {
       [id]
     );
     return result.rows[0];
+  }
+
+  static async isActive(id) {
+    const result = await pool.query('SELECT 1 FROM users WHERE id = $1 AND blocked_at IS NULL', [id]);
+    return result.rowCount > 0;
+  }
+
+  static async setBlocked(id, blocked) {
+    const result = await pool.query(
+      `UPDATE users
+       SET blocked_at = CASE WHEN $2::boolean THEN COALESCE(blocked_at, CURRENT_TIMESTAMP) ELSE NULL END
+       WHERE id = $1`,
+      [id, blocked]
+    );
+    if (result.rowCount === 0) throw new AccessError(404, 'User not found');
+    return (await selectUsers(pool, id)).rows[0];
   }
 
   static async findAllWithRoles() {

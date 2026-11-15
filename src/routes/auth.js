@@ -3,6 +3,7 @@ const router = express.Router();
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
 const { authenticateToken } = require('../middleware/auth');
+const sessions = require('../utils/sessions');
 
 // Register endpoint (S1)
 router.post('/register', async (req, res) => {
@@ -69,6 +70,10 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    if (user.blocked_at) {
+      return res.status(403).json({ error: 'Account blocked' });
+    }
+
     // Generate token
     const token = generateToken(user.id);
 
@@ -103,6 +108,19 @@ router.get('/me', authenticateToken, async (req, res) => {
     console.error('Get user error:', err);
     res.status(500).json({ error: 'Failed to fetch user' });
   }
+});
+
+// Server-sent events: tells the open app when this account is blocked
+router.get('/events', authenticateToken, (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  res.flushHeaders();
+  res.write(': connected\n\n');
+  sessions.add(req.userId, res);
 });
 
 // Logout endpoint (S4)

@@ -33,6 +33,7 @@ test('manages roles, permissions and user roles', async (t) => {
   app.use('/permissions', require('../src/routes/permissions'));
   app.use('/roles', require('../src/routes/roles'));
   app.use('/users', require('../src/routes/users'));
+  app.use('/auth', require('../src/routes/auth'));
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
@@ -68,13 +69,13 @@ test('manages roles, permissions and user roles', async (t) => {
 
   const bare = ({ created_at, ...user }) => { assert.ok(created_at); return user; };
   assert.deepEqual((await call('GET', '/users')).body.map(bare), [
-    { id: 1, email: 'admin@example.com', role: { id: 1, name: 'admin' } },
-    { id: 2, email: 'member@example.com', role: { id: 2, name: 'user' } }
+    { id: 1, email: 'admin@example.com', blocked: false, role: { id: 1, name: 'admin' } },
+    { id: 2, email: 'member@example.com', blocked: false, role: { id: 2, name: 'user' } }
   ]);
 
   response = await call('POST', '/users', { email: ' New@Example.com ', password: 'secret-pass', roleId: role.id });
   assert.equal(response.status, 201);
-  assert.deepEqual(bare(response.body), { id: 3, email: 'New@Example.com', role: { id: role.id, name: 'viewer' } });
+  assert.deepEqual(bare(response.body), { id: 3, email: 'New@Example.com', blocked: false, role: { id: role.id, name: 'viewer' } });
   const stored = await db.query('SELECT password FROM users WHERE id = 3');
   assert.match(stored.rows[0].password, /^\$2[aby]\$/);
   assert.equal((await call('POST', '/users', { email: 'New@Example.com', password: 'secret-pass', roleId: 2 })).status, 409);
@@ -84,7 +85,7 @@ test('manages roles, permissions and user roles', async (t) => {
   assert.equal((await call('POST', '/users', { email: 'a@b.co', password: 'secret-pass', roleId: 999 })).status, 400);
 
   response = await call('PUT', '/users/2', { email: 'renamed@example.com', roleId: role.id });
-  assert.deepEqual(bare(response.body), { id: 2, email: 'renamed@example.com', role: { id: role.id, name: 'viewer' } });
+  assert.deepEqual(bare(response.body), { id: 2, email: 'renamed@example.com', blocked: false, role: { id: role.id, name: 'viewer' } });
   const before = (await db.query('SELECT password FROM users WHERE id = 2')).rows[0].password;
   assert.equal(before, 'x');
   response = await call('PUT', '/users/2', { email: 'renamed@example.com', roleId: role.id, password: 'another-pass' });
@@ -94,6 +95,39 @@ test('manages roles, permissions and user roles', async (t) => {
   assert.equal((await call('PUT', '/users/2', { email: 'renamed@example.com', roleId: 999 })).status, 400);
   assert.equal((await call('PUT', '/users/999', { email: 'x@y.co', roleId: 2 })).status, 404);
   assert.equal((await call('PUT', '/users/2', { email: 'x@y.co', roleId: 2, password: 'short' })).status, 400);
+
+  // Blocking closes the session: API access, new logins and the open event stream.
+  const login = (email, password) => fetch(`${url}/auth/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password })
+  });
+  const events = await fetch(`${url}/auth/events`, {
+    headers: { Cookie: `token=${jwt.sign({ id: 3 }, process.env.JWT_SECRET)}` }
+  });
+  assert.equal(events.status, 200);
+  const reader = events.body.getReader();
+  const decoder = new TextDecoder();
+  assert.match(decoder.decode((await reader.read()).value), /connected/);
+  assert.equal((await login('New@Example.com', 'secret-pass')).status, 200);
+
+  assert.equal((await call('PUT', '/users/1/block')).status, 409);
+  assert.equal((await call('PUT', '/users/999/block')).status, 404);
+  assert.equal((await call('PUT', '/users/abc/block')).status, 400);
+  response = await call('PUT', '/users/3/block');
+  assert.equal(response.status, 200);
+  assert.equal(response.body.blocked, true);
+  assert.equal((await call('PUT', '/users/3/block')).status, 200);
+  assert.match(decoder.decode((await reader.read()).value), /event: blocked/);
+  assert.equal((await reader.read()).done, true);
+  assert.equal((await call('GET', '/users', undefined, 3)).status, 401);
+  assert.equal((await login('New@Example.com', 'secret-pass')).status, 403);
+  assert.equal((await login('New@Example.com', 'wrong-pass')).status, 401);
+  assert.equal((await call('GET', '/users')).body.find((user) => user.id === 3).blocked, true);
+
+  response = await call('DELETE', '/users/3/block');
+  assert.equal(response.body.blocked, false);
+  assert.equal((await call('GET', '/users', undefined, 3)).status, 200);
+  assert.equal((await login('New@Example.com', 'secret-pass')).status, 200);
+  assert.equal((await call('DELETE', '/users/999/block')).status, 404);
 
   assert.equal((await call('DELETE', `/roles/${role.id}`)).status, 409);
   assert.equal((await call('DELETE', '/roles/2')).status, 409);

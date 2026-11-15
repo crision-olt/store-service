@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 const { parseId, parseUserInput } = require('../utils/access-input');
 const { AccessError } = require('../utils/access-error');
+const sessions = require('../utils/sessions');
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -42,6 +43,29 @@ router.put('/:id', async (req, res) => {
     res.status(200).json(await User.update(id, { email, roleId, password }));
   } catch (err) {
     handleError(res, err, 'Update user');
+  }
+});
+
+router.put('/:id/block', async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'id must be a positive integer' });
+  if (id === req.userId) return res.status(409).json({ error: 'You cannot block your own account' });
+  try {
+    const user = await User.setBlocked(id, true);
+    sessions.closeUser(id);
+    res.status(200).json(user);
+  } catch (err) {
+    handleError(res, err, 'Block user');
+  }
+});
+
+router.delete('/:id/block', async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'id must be a positive integer' });
+  try {
+    res.status(200).json(await User.setBlocked(id, false));
+  } catch (err) {
+    handleError(res, err, 'Unblock user');
   }
 });
 

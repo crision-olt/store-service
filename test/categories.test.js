@@ -4,6 +4,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const Product = require('../src/models/Product');
+const User = require('../src/models/User');
 const router = require('../src/routes/products');
 
 test('category endpoints validate requests and expose database results', async (t) => {
@@ -20,6 +21,9 @@ test('category endpoints validate requests and expose database results', async (
     headers: { Cookie: `token=${token}`, 'Content-Type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) })
   });
+  const isActive = User.isActive;
+  User.isActive = async () => true;
+  t.after(() => { User.isActive = isActive; });
   const originals = { ...Product };
   for (const name of ['findCategories', 'findSubcategories', 'createCategory', 'createSubcategory', 'create']) {
     originals[name] = Product[name];

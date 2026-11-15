@@ -69,6 +69,15 @@ any authenticated user can call them.
 - `GET /users` - List users as `{ id, email, created_at, role: { id, name } }`.
 - `POST /users` - Create a user with `{ "email", "password", "roleId" }` (password 8 to 72 characters).
 - `PUT /users/:id` - Update a user with `{ "email", "roleId", "password" }`; omit `password` to keep the current one.
+- `PUT /users/:id/block` - Block a user: closes their open sessions immediately and rejects their token and login (`403 Account blocked`). You cannot block yourself (`409`).
+- `DELETE /users/:id/block` - Unblock a user.
+- `GET /auth/events` - Server-sent events stream for the signed-in user. The server sends `event: blocked` and closes the stream when an administrator blocks the account; the frontend then signs the user out.
+
+Every authenticated request checks the database, so a blocked or deleted user's token stops
+working at once (`401`) even though the JWT itself has not expired. Databases created before
+this feature need `sql/users-blocked.sql` (adds `users.blocked_at`). Open streams are kept in
+memory, so instant sign-out works with one service instance; with several, the blocked user
+is still rejected on their next request.
 
 Protection (returns `409`): the `user` role (used by registration) cannot be renamed
 or deleted. Unknown IDs return `404`.
