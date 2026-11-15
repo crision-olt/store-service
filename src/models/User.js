@@ -1,10 +1,9 @@
 const pool = require('../config/database');
 const bcrypt = require('bcrypt');
 const { AccessError } = require('../utils/access-error');
-const { withAccessTransaction } = require('../utils/transaction');
 
 const selectUsers = (client, id) => client.query(
-  `SELECT u.id, u.email, json_build_object('id', r.id, 'name', r.name) AS role
+  `SELECT u.id, u.email, u.created_at, json_build_object('id', r.id, 'name', r.name) AS role
    FROM users u JOIN roles r ON r.id = u.role_id
    WHERE $1::integer IS NULL OR u.id = $1
    ORDER BY u.email, u.id`,
@@ -21,6 +20,15 @@ class User {
       [email, hashedPassword]
     );
     return result.rows[0];
+  }
+
+  static async createWithRole(email, password, roleId) {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (email, password, role_id) VALUES ($1, $2, $3) RETURNING id',
+      [email, hashedPassword, roleId]
+    );
+    return (await selectUsers(pool, result.rows[0].id)).rows[0];
   }
 
   static async findByEmail(email) {
@@ -44,12 +52,14 @@ class User {
     return result.rows;
   }
 
-  static async updateRole(id, roleId) {
-    return withAccessTransaction(async (client) => {
-      const result = await client.query('UPDATE users SET role_id = $2 WHERE id = $1', [id, roleId]);
-      if (result.rowCount === 0) throw new AccessError(404, 'User not found');
-      return (await selectUsers(client, id)).rows[0];
-    });
+  static async update(id, { email, roleId, password }) {
+    const hashedPassword = password === undefined ? null : await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `UPDATE users SET email = $2, role_id = $3, password = COALESCE($4, password) WHERE id = $1`,
+      [id, email, roleId, hashedPassword]
+    );
+    if (result.rowCount === 0) throw new AccessError(404, 'User not found');
+    return (await selectUsers(pool, id)).rows[0];
   }
 
   static async validatePassword(plainPassword, hashedPassword) {

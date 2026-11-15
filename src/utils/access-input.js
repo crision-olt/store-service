@@ -19,12 +19,24 @@ const parseId = (value) => {
   return /^\d+$/.test(String(value)) && id >= 1 && id <= 2147483647 ? id : null;
 };
 
-const parseRoleId = (body) => {
-  const roleId = body && typeof body === 'object' ? body.roleId : undefined;
-  if (!Number.isInteger(roleId) || roleId < 1 || roleId > 2147483647) {
-    return { error: 'roleId must be a positive integer ID' };
+const isId = (value) => Number.isInteger(value) && value >= 1 && value <= 2147483647;
+
+// Passwords are optional on update; blank means "keep the current one".
+const parseUserInput = (body, { passwordRequired }) => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Invalid request body' };
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 255) {
+    return { error: 'email must be a valid email address of at most 255 characters' };
   }
-  return { roleId };
+  if (!isId(body.roleId)) return { error: 'roleId must be a positive integer ID' };
+  const hasPassword = typeof body.password === 'string' && body.password !== '';
+  if (body.password !== undefined && typeof body.password !== 'string') {
+    return { error: 'password must be a string' };
+  }
+  if ((passwordRequired || hasPassword) && (!hasPassword || body.password.length < 8 || body.password.length > 72)) {
+    return { error: 'password must be between 8 and 72 characters' };
+  }
+  return { email, roleId: body.roleId, password: hasPassword ? body.password : undefined };
 };
 
-module.exports = { parseName, parsePermissionIds, parseId, parseRoleId };
+module.exports = { parseName, parsePermissionIds, parseId, parseUserInput };

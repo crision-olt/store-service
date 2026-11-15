@@ -13,6 +13,7 @@ test('manages roles, permissions and user roles', async (t) => {
   t.after(() => db.close());
   await db.exec(await readFile(join(__dirname, '../sql/init.sql'), 'utf8'));
   await db.exec(`
+    INSERT INTO roles (name) VALUES ('user');
     INSERT INTO users (email, password, role_id) VALUES
       ('admin@example.com', 'x', (SELECT id FROM roles WHERE name = 'admin')),
       ('member@example.com', 'x', (SELECT id FROM roles WHERE name = 'user'));
@@ -63,21 +64,41 @@ test('manages roles, permissions and user roles', async (t) => {
   assert.equal((await call('PUT', `/roles/${role.id}`, { name: 'admin', permissionIds: [] })).status, 409);
   assert.equal((await call('PUT', `/roles/${role.id}`, { name: 'viewer', permissionIds: [999] })).status, 400);
   assert.equal((await call('PUT', '/roles/999', { name: 'x', permissionIds: [] })).status, 404);
-  assert.equal((await call('PUT', '/roles/1', { name: 'guest', permissionIds: [] })).status, 409);
+  assert.equal((await call('PUT', '/roles/2', { name: 'guest', permissionIds: [] })).status, 409);
 
-  assert.deepEqual((await call('GET', '/users')).body, [
-    { id: 1, email: 'admin@example.com', role: { id: 2, name: 'admin' } },
-    { id: 2, email: 'member@example.com', role: { id: 1, name: 'user' } }
+  const bare = ({ created_at, ...user }) => { assert.ok(created_at); return user; };
+  assert.deepEqual((await call('GET', '/users')).body.map(bare), [
+    { id: 1, email: 'admin@example.com', role: { id: 1, name: 'admin' } },
+    { id: 2, email: 'member@example.com', role: { id: 2, name: 'user' } }
   ]);
-  response = await call('PUT', '/users/2/role', { roleId: role.id });
-  assert.deepEqual(response.body, { id: 2, email: 'member@example.com', role: { id: role.id, name: 'viewer' } });
-  assert.equal((await call('PUT', '/users/2/role', { roleId: 999 })).status, 400);
-  assert.equal((await call('PUT', '/users/999/role', { roleId: 1 })).status, 404);
-  assert.equal((await call('PUT', '/users/2/role', { roleId: '1' })).status, 400);
+
+  response = await call('POST', '/users', { email: ' New@Example.com ', password: 'secret-pass', roleId: role.id });
+  assert.equal(response.status, 201);
+  assert.deepEqual(bare(response.body), { id: 3, email: 'New@Example.com', role: { id: role.id, name: 'viewer' } });
+  const stored = await db.query('SELECT password FROM users WHERE id = 3');
+  assert.match(stored.rows[0].password, /^\$2[aby]\$/);
+  assert.equal((await call('POST', '/users', { email: 'New@Example.com', password: 'secret-pass', roleId: 2 })).status, 409);
+  assert.equal((await call('POST', '/users', { email: 'bad', password: 'secret-pass', roleId: 2 })).status, 400);
+  assert.equal((await call('POST', '/users', { email: 'a@b.co', password: 'short', roleId: 2 })).status, 400);
+  assert.equal((await call('POST', '/users', { email: 'a@b.co', password: 'secret-pass', roleId: '1' })).status, 400);
+  assert.equal((await call('POST', '/users', { email: 'a@b.co', password: 'secret-pass', roleId: 999 })).status, 400);
+
+  response = await call('PUT', '/users/2', { email: 'renamed@example.com', roleId: role.id });
+  assert.deepEqual(bare(response.body), { id: 2, email: 'renamed@example.com', role: { id: role.id, name: 'viewer' } });
+  const before = (await db.query('SELECT password FROM users WHERE id = 2')).rows[0].password;
+  assert.equal(before, 'x');
+  response = await call('PUT', '/users/2', { email: 'renamed@example.com', roleId: role.id, password: 'another-pass' });
+  assert.equal(response.status, 200);
+  assert.notEqual((await db.query('SELECT password FROM users WHERE id = 2')).rows[0].password, 'x');
+  assert.equal((await call('PUT', '/users/2', { email: 'New@Example.com', roleId: 2 })).status, 409);
+  assert.equal((await call('PUT', '/users/2', { email: 'renamed@example.com', roleId: 999 })).status, 400);
+  assert.equal((await call('PUT', '/users/999', { email: 'x@y.co', roleId: 2 })).status, 404);
+  assert.equal((await call('PUT', '/users/2', { email: 'x@y.co', roleId: 2, password: 'short' })).status, 400);
 
   assert.equal((await call('DELETE', `/roles/${role.id}`)).status, 409);
-  assert.equal((await call('DELETE', '/roles/1')).status, 409);
-  await call('PUT', '/users/2/role', { roleId: 1 });
+  assert.equal((await call('DELETE', '/roles/2')).status, 409);
+  await call('PUT', '/users/2', { email: 'renamed@example.com', roleId: 2 });
+  await call('PUT', '/users/3', { email: 'New@Example.com', roleId: 2 });
   assert.equal((await call('DELETE', `/roles/${role.id}`)).status, 204);
   assert.equal((await call('DELETE', `/roles/${role.id}`)).status, 404);
 });

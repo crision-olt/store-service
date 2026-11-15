@@ -45,7 +45,7 @@ has every seeded permission: `read`, `create`, `edit` and `delete` for `products
 `categories`, `roles` and `users` (for example `products:read`). They are seed data
 only; no endpoint checks them.
 
-To bootstrap administration (the first admin; later changes go through `PUT /users/:id/role`), a database administrator must assign the `admin` role to
+To bootstrap administration (the first admin; later changes go through `PUT /users/:id`), a database administrator must assign the `admin` role to
 a trusted registered account using a controlled database connection. For example:
 
 ```sql
@@ -66,8 +66,9 @@ any authenticated user can call them.
 - `DELETE /permissions/:id` - Delete a permission that no role uses (`204`).
 - `PUT /roles/:id` - Replace a role's name and permissions with `{ "name", "permissionIds" }`.
 - `DELETE /roles/:id` - Delete a role that no user has (`204`).
-- `GET /users` - List users as `{ id, email, role: { id, name } }`.
-- `PUT /users/:id/role` - Assign a role to a user with `{ "roleId": 2 }`.
+- `GET /users` - List users as `{ id, email, created_at, role: { id, name } }`.
+- `POST /users` - Create a user with `{ "email", "password", "roleId" }` (password 8 to 72 characters).
+- `PUT /users/:id` - Update a user with `{ "email", "roleId", "password" }`; omit `password` to keep the current one.
 
 Protection (returns `409`): the `user` role (used by registration) cannot be renamed
 or deleted. Unknown IDs return `404`.
