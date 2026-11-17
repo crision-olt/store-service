@@ -66,6 +66,7 @@ test('list query rejects invalid input', () => {
     { pageSize: '1.5' },
     { search: { $ne: 'x' } },
     { category: 'Books' },
+    { category: ['1', 'Books'] },
     { subcategory: '0' }
   ]) {
     assert.ok(parseListQuery(query).error, JSON.stringify(query));
