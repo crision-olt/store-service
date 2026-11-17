@@ -39,6 +39,16 @@ test('list query combines every filter with parameterized values', () => {
   assert.deepEqual(count.values, ['%50\\%\\_off%', 1, 2, 5, 20.5]);
 });
 
+test('list query supports multiple category and subcategory IDs', () => {
+  const { rows, count } = build({
+    category: ['1', '3'],
+    subcategory: ['2', '4']
+  });
+  assert.match(rows.text, /category_id IN \(\$1, \$2\) AND subcategory_id IN \(\$3, \$4\)/);
+  assert.deepEqual(rows.values, [1, 3, 2, 4, 10, 0]);
+  assert.deepEqual(count.values, [1, 3, 2, 4]);
+});
+
 test('inStock=false only matches products without stock', () => {
   assert.match(build({ inStock: 'false' }).rows.text, /stock = 0/);
 });

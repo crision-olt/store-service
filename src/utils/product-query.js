@@ -15,6 +15,7 @@ const LIST_PARAMS = [
 ];
 
 const first = (value) => (Array.isArray(value) ? value[0] : value);
+const queryValues = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 
 const parseNumber = (raw, name) => {
   const value = Number(raw);
@@ -51,8 +52,8 @@ const parseListQuery = (query = {}) => {
 
   // Express parses `a[b]=c` into objects; every supported param must be a plain string.
   for (const name of LIST_PARAMS) {
-    const raw = first(query[name]);
-    if (raw !== undefined && typeof raw !== 'string') {
+    const rawValues = ['category', 'subcategory'].includes(name) ? queryValues(query[name]) : [first(query[name])];
+    if (rawValues.some((raw) => raw !== undefined && typeof raw !== 'string')) {
       return { error: `${name} must be a string` };
     }
   }
@@ -64,12 +65,16 @@ const parseListQuery = (query = {}) => {
   }
 
   for (const name of ['category', 'subcategory']) {
-    const raw = first(query[name]);
-    if (raw === undefined || raw === '') continue;
-    if (!/^[1-9]\d*$/.test(raw)) return { error: `${name} must be a positive integer ID` };
-    const parsed = parseInteger(raw, name, { min: 1, max: MAX_ID });
-    if (parsed.error) return { error: parsed.error };
-    filters[name] = parsed.value;
+    const ids = [];
+    for (const raw of queryValues(query[name])) {
+      if (raw === '') continue;
+      if (!/^[1-9]\d*$/.test(raw)) return { error: `${name} must be a positive integer ID` };
+      const parsed = parseInteger(raw, name, { min: 1, max: MAX_ID });
+      if (parsed.error) return { error: parsed.error };
+      ids.push(parsed.value);
+    }
+    const uniqueIds = [...new Set(ids)];
+    filters[name] = uniqueIds.length > 1 ? uniqueIds : uniqueIds[0];
   }
 
   for (const name of ['minPrice', 'maxPrice']) {
@@ -143,8 +148,14 @@ const buildListQuery = (filters) => {
       `(name ILIKE ${placeholder} OR sku ILIKE ${placeholder} OR description ILIKE ${placeholder})`
     );
   }
-  if (filters.category) conditions.push(`category_id = ${param(filters.category)}`);
-  if (filters.subcategory) conditions.push(`subcategory_id = ${param(filters.subcategory)}`);
+  for (const name of ['category', 'subcategory']) {
+    const column = name === 'category' ? 'category_id' : 'subcategory_id';
+    const filterValues = queryValues(filters[name]);
+    if (filterValues.length === 1) conditions.push(`${column} = ${param(filterValues[0])}`);
+    else if (filterValues.length > 1) {
+      conditions.push(`${column} IN (${filterValues.map(param).join(', ')})`);
+    }
+  }
   if (filters.minPrice !== undefined) conditions.push(`price >= ${param(filters.minPrice)}`);
   if (filters.maxPrice !== undefined) conditions.push(`price <= ${param(filters.maxPrice)}`);
   if (filters.inStock === true) conditions.push('stock > 0');
