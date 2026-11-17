@@ -21,6 +21,19 @@ class Product {
     return toProduct(result.rows[0]);
   }
 
+  static async update(id, { name, description, sku, categoryId, subcategoryId, price, stock }) {
+    const result = await pool.query(
+      `WITH products AS (
+        UPDATE products
+        SET name = $2, description = $3, sku = $4, category_id = $5,
+            subcategory_id = $6, price = $7, stock = $8
+        WHERE id = $1 RETURNING *
+      ) SELECT ${PRODUCT_COLUMNS} FROM products`,
+      [id, name, description, sku, categoryId, subcategoryId, price, stock]
+    );
+    return toProduct(result.rows[0]);
+  }
+
   static async findAll(filters) {
     const query = buildListQuery(filters);
     const [rows, count] = await Promise.all([

@@ -104,6 +104,29 @@ router.post('/subcategories', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  if (!/^\d+$/.test(req.params.id) || !isId(Number(req.params.id))) {
+    return res.status(400).json({ error: 'Product id must be a positive integer' });
+  }
+  const { product: input, error } = parseProductInput(req.body);
+  if (error) return res.status(400).json({ error });
+
+  try {
+    const product = await Product.update(Number(req.params.id), input);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    res.status(200).json(product);
+  } catch (err) {
+    if (err.code === UNIQUE_VIOLATION) {
+      return res.status(409).json({ error: 'A product with this SKU already exists' });
+    }
+    if (err.code === FOREIGN_KEY_VIOLATION) {
+      return res.status(400).json({ error: 'Category or subcategory is invalid for this product' });
+    }
+    console.error('Update product error:', err);
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
 // Get product by id
 router.get('/:id', async (req, res) => {
   if (!/^\d+$/.test(req.params.id) || Number(req.params.id) > 2147483647) {

@@ -184,7 +184,7 @@ const buildListQuery = (filters) => {
   };
 };
 
-// Validates a POST /products body. Returns { product } or { error }.
+// Validates product creation and replacement bodies. Returns { product } or { error }.
 const parseProductInput = (body) => {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { error: 'Request body must be a JSON object' };

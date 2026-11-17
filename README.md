@@ -88,6 +88,7 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
 ### Products (all require a valid JWT cookie)
 
 - `POST /products` - Create a product. JSON body: `name`, `sku` (unique), `categoryId`, `price` (max 2 decimals), optional `subcategoryId`, `description` and `stock` (default `0`). IDs must be positive integers, and the subcategory must belong to the category. Returns `400` for invalid references and `409` if the SKU exists.
+- `PUT /products/:id` - Replace a product's editable fields using the same body and validation as creation. Returns the updated product, preserving its ID and creation date. Returns `400` for invalid input or references, `404` if missing, and `409` if another product uses the SKU. Omitted optional fields reset to their creation defaults; send the complete form to retain them.
 - `GET /products` - List products. Response: `{ data, total, page, pageSize }`. Query params (all optional):
   - `search` - case-insensitive match on name, SKU or description
   - `category` - exact category ID
