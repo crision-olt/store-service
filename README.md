@@ -119,6 +119,81 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
 - Creating duplicate category names, or duplicate subcategory names within the same category, returns `409`. A nonexistent parent category returns `400`.
 - `GET /products/:id` - Get a product by id (`404` if missing)
 
+## Streaming Excel exports
+
+`POST /exports/xlsx` requires the existing JWT session cookie and an uncompressed
+UTF-8 `application/json` body. Send header labels separately from the data rows:
+
+```json
+{
+  "headers": ["Product", "Price", "In stock"],
+  "rows": [
+    ["Blue mug", 12.5, true],
+    ["Plate", null, false]
+  ]
+}
+```
+
+The object must contain exactly `headers` followed by `rows`, in that order:
+headers must be available before rows can stream. Header labels must be strings;
+`rows` is an array of cell arrays. An empty `rows` array exports just the header.
+The header has a slate background, and data rows alternate white and pale slate.
+The current writer supports fills and number formats, but not bold fonts, column
+widths or frozen headers. This is a styled worksheet, not an Excel structured
+table with filter controls.
+
+The original top-level array format remains supported, with alternating data-row
+colors but no inferred header. For example, `[["Blue mug", 12.5, true]]` exports
+one data row.
+
+The response is an XLSX attachment with one worksheet. The frontend can choose its
+download name using `?filename=products.xlsx` (URL-encode the value); it defaults
+to `export.xlsx`, and `.xlsx` is appended if missing. The name is limited to 200
+UTF-8 bytes before appending the extension; empty names, paths, control characters,
+`.` and `..` are rejected with `400`. Unicode names are safely encoded in
+`Content-Disposition`, which is exposed to cross-origin clients.
+
+Strings, finite numbers, booleans and `null` are supported; `null` leaves a blank
+cell without shifting the following columns. Strings starting with `=` remain
+literal text, not formulas. Number formats are not inferred from cell values.
+
+```bash
+curl --fail --remove-on-error \
+  --cookie 'token=YOUR_SESSION_TOKEN' \
+  --header 'Content-Type: application/json' \
+  --request POST --upload-file cells.json \
+  --output export.xlsx \
+  'http://localhost:3000/exports/xlsx?filename=products.xlsx'
+```
+
+The upload file is read incrementally. JSON parsing, XLSX generation and the HTTP
+download all stream with backpressure; no complete request/workbook is buffered
+and no temporary export file is created. This route runs **before** the ordinary
+JSON body parser. `xlsx-stream-writer` 1.3.2 uses a pull-based writer with inline
+strings, avoiding a shared-string table that grows with the export; `stream-json`
+3.9.0 parses bounded tokens. The XLSX writer requires Node 20.19 or newer.
+
+Clients must consume the response while uploading large requests, as curl and
+Node's HTTP client can do. A client that waits for the entire upload before
+reading the response can stall when backpressure reaches it; browser `fetch`
+streaming uploads are half-duplex and are not suitable for this simultaneous flow.
+Reverse proxies must also allow streaming uploads/responses instead of buffering
+them. Keep proxy body-size/time limits appropriate for the intended export size.
+
+Limits: 1,048,576 rows (including the header), 16,384 cells per row, 32,767 characters per string, and
+4,194,304 characters of cell content per row. Objects, nested cell arrays,
+non-finite numbers and text invalid in Excel XML are rejected. An empty array
+produces an empty worksheet. All input is streamed, but each individual row is
+assembled within these bounds.
+
+Invalid input detected before download starts returns JSON (`400`), size limits
+return `413`, unsupported content types/encodings return `415`, and missing or
+expired sessions return `401`. The first row is validated before starting the
+download. Once XLSX bytes have been sent, late invalid JSON or generation failures
+**abort the download** instead of appending JSON or returning a misleading valid
+file. Clients must discard incomplete downloads. Disconnecting cancels parsing and
+generation.
+
 ## Tests
 
 ```bash
