@@ -15,6 +15,7 @@ Centralized authentication microservice for SSO across multiple applications.
    createdb auth_sso
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/init.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/products.sql
+   psql -v ON_ERROR_STOP=1 auth_sso -f sql/allergens.sql
    ```
 
 3. **Configure environment:**
@@ -50,6 +51,13 @@ psql -v ON_ERROR_STOP=1 auth_sso -f sql/products-remove-stock.sql
 
 This permanently removes stored stock values without deleting products. Back up
 the database first. New databases do not need this migration.
+
+### Allergen catalog setup
+
+On an existing database, run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/allergens.sql`
+before using the Allergens page. This repeatable script adds the 14 categories
+from [EU Regulation 1169/2011, Annex II](https://eur-lex.europa.eu/eli/reg/2011/1169/oj)
+without changing any products.
 
 ## API Endpoints
 
@@ -126,6 +134,12 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
 - `POST /products/subcategories` - Create a subcategory with `{ "name": "Mugs", "categoryId": 1 }`.
 - Creating duplicate category names, or duplicate subcategory names within the same category, returns `409`. A nonexistent parent category returns `400`.
 - `GET /products/:id` - Get a product by id (`404` if missing)
+
+### Allergens
+
+- `GET /allergens` - Requires a valid JWT cookie. Returns the read-only catalog as
+  an array of `{ id, code, name, nameEs }` in Annex II order. It does not report
+  allergens for individual products.
 
 ## Streaming Excel exports
 
