@@ -44,7 +44,7 @@ test('edits products through the API and leaves rejected updates unchanged', asy
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     });
-    return { status: response.status, body: await response.json() };
+    return { status: response.status, body: response.status === 204 ? null : await response.json() };
   };
   const original = {
     name: 'Mug', sku: 'MUG-1', description: 'Original', categoryId: 1,
@@ -99,4 +99,47 @@ test('edits products through the API and leaves rejected updates unchanged', asy
   const list = await call('GET', '?search=pen');
   assert.equal(list.status, 200);
   assert.deepEqual(list.body.data, [response.body]);
+
+  await t.test('archives products without deleting their data and rejects invalid requests without changes', async () => {
+    const beforeArchive = await snapshot();
+    const visibleProduct = (await call('GET', `/${id}`)).body;
+    for (const [path, status, authenticated] of [
+      ['/0/archive', 400, true],
+      ['/abc/archive', 400, true],
+      ['/2147483648/archive', 400, true],
+      ['/999/archive', 404, true],
+      [`/${id}/archive`, 401, false]
+    ]) {
+      const rejected = await call('POST', path, undefined, authenticated);
+      assert.equal(rejected.status, status);
+      assert.equal(typeof rejected.body.error, 'string');
+      assert.deepEqual(await snapshot(), beforeArchive);
+    }
+
+    const archived = await call('POST', `/${id}/archive`);
+    assert.deepEqual(archived, { status: 204, body: null });
+    const afterArchive = await snapshot();
+    const archivedRow = afterArchive.rows.find((row) => row.id === id);
+    assert.ok(archivedRow.archived_at);
+    assert.deepEqual(afterArchive.rows, beforeArchive.rows.map((row) =>
+      row.id === id ? { ...row, archived_at: archivedRow.archived_at } : row
+    ));
+    assert.equal((await call('GET', `/${id}`)).status, 404);
+    assert.equal((await call('PUT', `/${id}`, original)).status, 404);
+    assert.equal((await call('POST', `/${id}/archive`)).status, 204);
+    assert.deepEqual(await snapshot(), afterArchive);
+    const remaining = await call('GET', '');
+    assert.equal(remaining.body.total, 1);
+    assert.deepEqual(remaining.body.data, [other.body]);
+    for (const query of ['?search=pen', '?category=2', '?subcategory=2', '?maxPrice=0&inStock=false']) {
+      const filtered = await call('GET', query);
+      assert.equal(filtered.status, 200);
+      assert.equal(filtered.body.total, 0);
+      assert.deepEqual(filtered.body.data, []);
+    }
+
+    await db.query('UPDATE products SET archived_at = NULL WHERE id = $1', [id]);
+    assert.deepEqual((await call('GET', `/${id}`)).body, visibleProduct);
+    assert.equal((await call('GET', '')).body.total, 2);
+  });
 });

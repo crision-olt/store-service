@@ -36,4 +36,14 @@ test('creates the product schema with category and subcategory relationships', a
     db.query('INSERT INTO subcategories (category_id, name) VALUES ($1, $2)', [1, 'Mugs']),
     { code: '23505' }
   );
+
+  await t.test('migrates existing products without altering data and can be run again', async () => {
+    await db.exec('ALTER TABLE products DROP COLUMN IF EXISTS archived_at');
+    const before = await db.query('SELECT * FROM products ORDER BY id');
+    const migration = await readFile(join(__dirname, '../sql/products-archived.sql'), 'utf8');
+    await db.exec(migration);
+    await db.exec(migration);
+    const after = await db.query('SELECT * FROM products ORDER BY id');
+    assert.deepEqual(after.rows, before.rows.map((row) => ({ ...row, archived_at: null })));
+  });
 });

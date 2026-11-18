@@ -30,6 +30,18 @@ Centralized authentication microservice for SSO across multiple applications.
 
 Service will run on http://localhost:3000
 
+### Existing product databases
+
+Before starting the updated service on a database created before product archiving,
+run:
+
+```bash
+psql -v ON_ERROR_STOP=1 auth_sso -f sql/products-archived.sql
+```
+
+This adds nullable archive metadata, preserves existing product data, and is safe
+to run again. New databases already include it in `sql/products.sql`.
+
 ## API Endpoints
 
 - `POST /auth/register` - Register new user
@@ -89,6 +101,7 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
 
 - `POST /products` - Create a product. JSON body: `name`, `sku` (unique), `categoryId`, `price` (max 2 decimals), optional `subcategoryId`, `description` and `stock` (default `0`). IDs must be positive integers, and the subcategory must belong to the category. Returns `400` for invalid references and `409` if the SKU exists.
 - `PUT /products/:id` - Replace a product's editable fields using the same body and validation as creation. Returns the updated product, preserving its ID and creation date. Returns `400` for invalid input or references, `404` if missing, and `409` if another product uses the SKU. Omitted optional fields reset to their creation defaults; send the complete form to retain them.
+- `POST /products/:id/archive` - Archive a product without deleting its data. Returns `204`, including when already archived, `400` for an invalid ID, or `404` if missing. Archived products are excluded from listings and totals; fetching or editing one returns `404`. Their SKUs remain reserved. There is no restore endpoint yet.
 - `GET /products` - List products. Response: `{ data, total, page, pageSize }`. Query params (all optional):
   - `search` - case-insensitive match on name, SKU or description
   - `category` - exact category ID

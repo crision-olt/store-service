@@ -12,7 +12,8 @@ test('list query defaults to newest first, page 1 of 10', () => {
   const { rows, count } = build({});
   assert.match(rows.text, /ORDER BY created_at DESC, id DESC LIMIT \$1 OFFSET \$2$/);
   assert.deepEqual(rows.values, [10, 0]);
-  assert.doesNotMatch(rows.text, /FROM products WHERE/);
+  assert.match(rows.text, /FROM products WHERE archived_at IS NULL ORDER BY/);
+  assert.match(count.text, /WHERE archived_at IS NULL$/);
   assert.deepEqual(count.values, []);
 });
 
@@ -29,7 +30,7 @@ test('list query combines every filter with parameterized values', () => {
     page: '3',
     pageSize: '25'
   });
-  assert.match(rows.text, /WHERE \(name ILIKE \$1 OR sku ILIKE \$1 OR description ILIKE \$1\)/);
+  assert.match(rows.text, /WHERE archived_at IS NULL AND \(name ILIKE \$1 OR sku ILIKE \$1 OR description ILIKE \$1\)/);
   assert.match(
     rows.text,
     /category_id = \$2 AND subcategory_id = \$3 AND price >= \$4 AND price <= \$5 AND stock > 0/

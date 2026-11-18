@@ -17,7 +17,7 @@ class Product {
   }
 
   static async findById(id) {
-    const result = await pool.query(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = $1`, [id]);
+    const result = await pool.query(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = $1 AND archived_at IS NULL`, [id]);
     return toProduct(result.rows[0]);
   }
 
@@ -27,11 +27,19 @@ class Product {
         UPDATE products
         SET name = $2, description = $3, sku = $4, category_id = $5,
             subcategory_id = $6, price = $7, stock = $8
-        WHERE id = $1 RETURNING *
+        WHERE id = $1 AND archived_at IS NULL RETURNING *
       ) SELECT ${PRODUCT_COLUMNS} FROM products`,
       [id, name, description, sku, categoryId, subcategoryId, price, stock]
     );
     return toProduct(result.rows[0]);
+  }
+
+  static async archive(id) {
+    const result = await pool.query(
+      'UPDATE products SET archived_at = COALESCE(archived_at, CURRENT_TIMESTAMP) WHERE id = $1 RETURNING id',
+      [id]
+    );
+    return result.rows[0];
   }
 
   static async findAll(filters) {

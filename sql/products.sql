@@ -23,6 +23,7 @@ CREATE TABLE products (
   price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
   stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  archived_at TIMESTAMP,
   CONSTRAINT products_category_fk FOREIGN KEY (category_id) REFERENCES categories(id),
   CONSTRAINT products_subcategory_fk
     FOREIGN KEY (subcategory_id, category_id) REFERENCES subcategories(id, category_id)

@@ -135,7 +135,7 @@ const parseListQuery = (query = {}) => {
 
 // Builds parameterized SQL. Column names come from the SORTABLE_COLUMNS whitelist only.
 const buildListQuery = (filters) => {
-  const conditions = [];
+  const conditions = ['archived_at IS NULL'];
   const values = [];
   const param = (value) => {
     values.push(value);
