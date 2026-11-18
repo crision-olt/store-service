@@ -17,6 +17,7 @@ Centralized authentication microservice for SSO across multiple applications.
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/products.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/allergens.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/product-allergens.sql
+   psql -v ON_ERROR_STOP=1 auth_sso -f sql/offers.sql
    ```
 
 3. **Configure environment:**
@@ -63,6 +64,12 @@ without changing any products.
 Then run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/product-allergens.sql` before
 deploying the updated Products API. It creates the relationship table without
 assigning any allergens to existing products and can be run again.
+
+### Menus and promotions setup
+
+Run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/offers.sql` after `sql/products.sql`
+and before deploying the Offers API. Rerun it on databases with existing offers
+to enable minimum-product promotions without changing saved offers.
 
 ## API Endpoints
 
@@ -148,6 +155,22 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
 - `GET /allergens` - Requires a valid JWT cookie. Returns the read-only catalog as
   an array of `{ id, code, name, nameEs }` in Annex II order. It does not report
   allergens for individual products.
+
+### Menus and promotions
+
+All offer endpoints require a valid session cookie. `GET /offers` lists saved
+configurations. Use `POST /offers` to create one or `PUT /offers/:id` to replace it.
+Send `{ name, kind, amount, productIds }`. A `menu` stores a fixed total price in
+euros; a `promotion` stores a percentage greater than 0 and no greater than 100.
+Both accept up to two decimals. A bundle contains each of its selected products
+once. Only active products can be saved in an offer.
+
+For a promotion that qualifies with any subset of the eligible products, include
+`minimumDistinctProducts` (1 to the number of eligible product IDs). For example,
+six eligible coffees and a minimum of four require four different coffees from
+that list; multiple units of the same coffee count as one. Omit the field or send
+`null` for a fixed bundle. This is configuration only; it does not apply
+discounts to table orders.
 
 ## Streaming Excel exports
 
