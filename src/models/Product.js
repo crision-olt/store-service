@@ -4,16 +4,43 @@ const { buildListQuery, PRODUCT_COLUMNS } = require('../utils/product-query');
 // NUMERIC columns come back from pg as strings; the API exposes price as a number.
 const toProduct = (row) => (row ? { ...row, price: Number(row.price) } : row);
 
+async function saveProduct(sql, params, allergenIds) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [saved] } = await client.query(sql, params);
+    let product;
+    if (saved) {
+      if (allergenIds !== undefined) {
+        await client.query('DELETE FROM product_allergens WHERE product_id = $1', [saved.id]);
+        if (allergenIds.length > 0) {
+          await client.query(
+            'INSERT INTO product_allergens (product_id, allergen_id) SELECT $1, id FROM unnest($2::smallint[]) AS ids(id)',
+            [saved.id, allergenIds]
+          );
+        }
+      }
+      const { rows } = await client.query(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = $1`, [saved.id]);
+      product = toProduct(rows[0]);
+    }
+    await client.query('COMMIT');
+    return product;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 class Product {
-  static async create({ name, description, sku, categoryId, subcategoryId, price }) {
-    const result = await pool.query(
-      `WITH products AS (
-        INSERT INTO products (name, description, sku, category_id, subcategory_id, price)
-        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-      ) SELECT ${PRODUCT_COLUMNS} FROM products`,
-      [name, description, sku, categoryId, subcategoryId, price]
+  static async create({ name, description, sku, categoryId, subcategoryId, price, allergenIds }) {
+    return saveProduct(
+      `INSERT INTO products (name, description, sku, category_id, subcategory_id, price)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [name, description, sku, categoryId, subcategoryId, price],
+      allergenIds
     );
-    return toProduct(result.rows[0]);
   }
 
   static async findById(id) {
@@ -21,17 +48,14 @@ class Product {
     return toProduct(result.rows[0]);
   }
 
-  static async update(id, { name, description, sku, categoryId, subcategoryId, price }) {
-    const result = await pool.query(
-      `WITH products AS (
-        UPDATE products
-        SET name = $2, description = $3, sku = $4, category_id = $5,
-            subcategory_id = $6, price = $7
-        WHERE id = $1 AND archived_at IS NULL RETURNING *
-      ) SELECT ${PRODUCT_COLUMNS} FROM products`,
-      [id, name, description, sku, categoryId, subcategoryId, price]
+  static async update(id, { name, description, sku, categoryId, subcategoryId, price, allergenIds }) {
+    return saveProduct(
+      `UPDATE products
+       SET name = $2, description = $3, sku = $4, category_id = $5, subcategory_id = $6, price = $7
+       WHERE id = $1 AND archived_at IS NULL RETURNING id`,
+      [id, name, description, sku, categoryId, subcategoryId, price],
+      allergenIds
     );
-    return toProduct(result.rows[0]);
   }
 
   static async archive(id) {

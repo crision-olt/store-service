@@ -8,7 +8,8 @@ const PRODUCT_COLUMNS = `id, name, description, sku,
   (SELECT name FROM categories WHERE id = products.category_id) AS "categoryName",
   subcategory_id AS "subcategoryId",
   (SELECT name FROM subcategories WHERE id = products.subcategory_id) AS "subcategoryName",
-  price, created_at`;
+  price, created_at,
+  ARRAY(SELECT allergen_id FROM product_allergens WHERE product_id = products.id ORDER BY allergen_id) AS "allergenIds"`;
 
 const LIST_PARAMS = [
   'search', 'category', 'subcategory', 'minPrice', 'maxPrice', 'sortBy', 'sortOrder', 'page', 'pageSize'
@@ -223,6 +224,14 @@ const parseProductInput = (body) => {
     return { error: 'price must have at most 2 decimal places' };
   }
   product.price = price;
+
+  if (body.allergenIds !== undefined) {
+    if (!Array.isArray(body.allergenIds) || body.allergenIds.length > 14 ||
+        body.allergenIds.some((id) => !Number.isInteger(id) || id < 1 || id > 32767)) {
+      return { error: 'allergenIds must be an array of up to 14 positive integer allergen IDs' };
+    }
+    product.allergenIds = [...new Set(body.allergenIds)];
+  }
 
   return { product };
 };

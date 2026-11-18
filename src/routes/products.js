@@ -32,6 +32,9 @@ router.post('/', async (req, res) => {
       return res.status(409).json({ error: 'A product with this SKU already exists' });
     }
     if (err.code === FOREIGN_KEY_VIOLATION) {
+      if (err.constraint === 'product_allergens_catalog_fk') {
+        return res.status(400).json({ error: 'One or more allergens do not exist' });
+      }
       return res.status(400).json({ error: 'Category or subcategory is invalid for this product' });
     }
     console.error('Create product error:', err);
@@ -134,6 +137,9 @@ router.put('/:id', async (req, res) => {
       return res.status(409).json({ error: 'A product with this SKU already exists' });
     }
     if (err.code === FOREIGN_KEY_VIOLATION) {
+      if (err.constraint === 'product_allergens_catalog_fk') {
+        return res.status(400).json({ error: 'One or more allergens do not exist' });
+      }
       return res.status(400).json({ error: 'Category or subcategory is invalid for this product' });
     }
     console.error('Update product error:', err);

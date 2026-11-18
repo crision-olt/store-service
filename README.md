@@ -16,6 +16,7 @@ Centralized authentication microservice for SSO across multiple applications.
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/init.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/products.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/allergens.sql
+   psql -v ON_ERROR_STOP=1 auth_sso -f sql/product-allergens.sql
    ```
 
 3. **Configure environment:**
@@ -58,6 +59,10 @@ On an existing database, run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/allergens.
 before using the Allergens page. This repeatable script adds the 14 categories
 from [EU Regulation 1169/2011, Annex II](https://eur-lex.europa.eu/eli/reg/2011/1169/oj)
 without changing any products.
+
+Then run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/product-allergens.sql` before
+deploying the updated Products API. It creates the relationship table without
+assigning any allergens to existing products and can be run again.
 
 ## API Endpoints
 
@@ -128,6 +133,9 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
   - `sortOrder` - `asc` or `desc` (default `desc`)
   - `page` (default `1`), `pageSize` (default `10`, max `100`)
 - Products include `categoryId`, `categoryName`, `subcategoryId` and `subcategoryName`; subcategory fields may be `null`.
+- Product responses also include `allergenIds`. On create or edit, send an array of
+  IDs from `GET /allergens`. On edit, `[]` clears the assignments; omitting the
+  field preserves them. Invalid IDs reject the entire save.
 - `GET /products/categories` - List `{ id, name }` categories, including those without products.
 - `POST /products/categories` - Create a category with `{ "name": "Kitchen" }`.
 - `GET /products/subcategories` - List `{ id, name, categoryId }` subcategories, optionally limited by `?category=<id>`.

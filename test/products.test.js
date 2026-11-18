@@ -11,7 +11,7 @@ test('edits products through the API and leaves rejected updates unchanged', asy
   process.env.JWT_SECRET = 'test-secret';
   const db = new PGlite();
   t.after(() => db.close());
-  for (const file of ['init.sql', 'products.sql']) {
+  for (const file of ['init.sql', 'products.sql', 'allergens.sql', 'product-allergens.sql', 'product-allergens.sql']) {
     await db.exec(await readFile(join(__dirname, '../sql', file), 'utf8'));
   }
   await db.exec(`
@@ -23,7 +23,8 @@ test('edits products through the API and leaves rejected updates unchanged', asy
   require.cache[databasePath] = {
     id: databasePath, filename: databasePath, loaded: true,
     exports: {
-      query: (sql, params) => typeof sql === 'string' ? db.query(sql, params) : db.query(sql.text, sql.values)
+      query: (sql, params) => typeof sql === 'string' ? db.query(sql, params) : db.query(sql.text, sql.values),
+      connect: async () => ({ query: db.query.bind(db), release() {} })
     }
   };
   t.after(() => { delete require.cache[databasePath]; });
@@ -56,6 +57,20 @@ test('edits products through the API and leaves rejected updates unchanged', asy
   const other = await call('POST', '', { ...original, name: 'Plate', sku: 'PLATE-1' });
   assert.equal(other.status, 201);
   const id = created.body.id;
+  assert.deepEqual(other.body.allergenIds, []);
+  const allergenic = await call('POST', '', { ...original, sku: 'ALLERGEN-1', allergenIds: [7, 3, 7] });
+  assert.equal(allergenic.status, 201);
+  assert.deepEqual(allergenic.body.allergenIds, [3, 7]);
+  const allergenicPath = `/${allergenic.body.id}`;
+  assert.equal((await call('PUT', allergenicPath, {
+    ...original, name: 'Must not be saved', sku: 'ALLERGEN-1', allergenIds: [99]
+  })).status, 400);
+  assert.deepEqual((await call('GET', allergenicPath)).body, allergenic.body);
+  assert.deepEqual((await call('GET', '?search=ALLERGEN-1')).body.data, [allergenic.body]);
+  assert.deepEqual((await call('PUT', allergenicPath, { ...original, sku: 'ALLERGEN-1' })).body.allergenIds, [3, 7]);
+  assert.deepEqual((await call('PUT', allergenicPath, { ...original, sku: 'ALLERGEN-1', allergenIds: [5] })).body.allergenIds, [5]);
+  assert.deepEqual((await call('PUT', allergenicPath, { ...original, sku: 'ALLERGEN-1', allergenIds: [] })).body.allergenIds, []);
+  assert.equal((await call('POST', `${allergenicPath}/archive`)).status, 204);
   const input = {
     name: ' New pen ', sku: ' PEN-1 ', description: ' Updated ', categoryId: 2,
     subcategoryId: 2, price: 0
