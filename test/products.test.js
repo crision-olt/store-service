@@ -48,16 +48,17 @@ test('edits products through the API and leaves rejected updates unchanged', asy
   };
   const original = {
     name: 'Mug', sku: 'MUG-1', description: 'Original', categoryId: 1,
-    subcategoryId: 1, price: 9.99, stock: 5
+    subcategoryId: 1, price: 9.99
   };
   const created = await call('POST', '', original);
   assert.equal(created.status, 201);
+  assert.equal(Object.hasOwn(created.body, 'stock'), false);
   const other = await call('POST', '', { ...original, name: 'Plate', sku: 'PLATE-1' });
   assert.equal(other.status, 201);
   const id = created.body.id;
   const input = {
     name: ' New pen ', sku: ' PEN-1 ', description: ' Updated ', categoryId: 2,
-    subcategoryId: 2, price: 0, stock: 0
+    subcategoryId: 2, price: 0
   };
   let response = await call('PUT', `/${id}`, input);
   assert.equal(response.status, 200);
@@ -76,7 +77,6 @@ test('edits products through the API and leaves rejected updates unchanged', asy
     [`/${id}`, { ...input, categoryId: 999, subcategoryId: null }, 400],
     [`/${id}`, { ...input, name: ' ' }, 400],
     [`/${id}`, { ...input, price: 1.001 }, 400],
-    [`/${id}`, { ...input, stock: -1 }, 400],
     ['/0', input, 400],
     ['/abc', input, 400],
     ['/2147483648', input, 400],
@@ -131,7 +131,7 @@ test('edits products through the API and leaves rejected updates unchanged', asy
     const remaining = await call('GET', '');
     assert.equal(remaining.body.total, 1);
     assert.deepEqual(remaining.body.data, [other.body]);
-    for (const query of ['?search=pen', '?category=2', '?subcategory=2', '?maxPrice=0&inStock=false']) {
+    for (const query of ['?search=pen', '?category=2', '?subcategory=2', '?maxPrice=0']) {
       const filtered = await call('GET', query);
       assert.equal(filtered.status, 200);
       assert.equal(filtered.body.total, 0);

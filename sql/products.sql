@@ -21,7 +21,6 @@ CREATE TABLE products (
   category_id INTEGER NOT NULL,
   subcategory_id INTEGER,
   price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
-  stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   archived_at TIMESTAMP,
   CONSTRAINT products_category_fk FOREIGN KEY (category_id) REFERENCES categories(id),

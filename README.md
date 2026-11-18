@@ -42,6 +42,15 @@ psql -v ON_ERROR_STOP=1 auth_sso -f sql/products-archived.sql
 This adds nullable archive metadata, preserves existing product data, and is safe
 to run again. New databases already include it in `sql/products.sql`.
 
+After deploying the stock-free service, run this migration on existing databases:
+
+```bash
+psql -v ON_ERROR_STOP=1 auth_sso -f sql/products-remove-stock.sql
+```
+
+This permanently removes stored stock values without deleting products. Back up
+the database first. New databases do not need this migration.
+
 ## API Endpoints
 
 - `POST /auth/register` - Register new user
@@ -99,7 +108,7 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
 
 ### Products (all require a valid JWT cookie)
 
-- `POST /products` - Create a product. JSON body: `name`, `sku` (unique), `categoryId`, `price` (max 2 decimals), optional `subcategoryId`, `description` and `stock` (default `0`). IDs must be positive integers, and the subcategory must belong to the category. Returns `400` for invalid references and `409` if the SKU exists.
+- `POST /products` - Create a product. JSON body: `name`, `sku` (unique), `categoryId`, `price` (max 2 decimals), optional `subcategoryId` and `description`. IDs must be positive integers, and the subcategory must belong to the category. Returns `400` for invalid references and `409` if the SKU exists.
 - `PUT /products/:id` - Replace a product's editable fields using the same body and validation as creation. Returns the updated product, preserving its ID and creation date. Returns `400` for invalid input or references, `404` if missing, and `409` if another product uses the SKU. Omitted optional fields reset to their creation defaults; send the complete form to retain them.
 - `POST /products/:id/archive` - Archive a product without deleting its data. Returns `204`, including when already archived, `400` for an invalid ID, or `404` if missing. Archived products are excluded from listings and totals; fetching or editing one returns `404`. Their SKUs remain reserved. There is no restore endpoint yet.
 - `GET /products` - List products. Response: `{ data, total, page, pageSize }`. Query params (all optional):
@@ -107,8 +116,7 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
   - `category` - exact category ID
   - `subcategory` - exact subcategory ID
   - `minPrice`, `maxPrice` - price range (inclusive)
-  - `inStock` - `true` (stock > 0) or `false` (stock = 0)
-  - `sortBy` - `id`, `name`, `sku`, `category`, `subcategory`, `price`, `stock` or `created_at` (default `created_at`)
+  - `sortBy` - `id`, `name`, `sku`, `category`, `subcategory`, `price` or `created_at` (default `created_at`)
   - `sortOrder` - `asc` or `desc` (default `desc`)
   - `page` (default `1`), `pageSize` (default `10`, max `100`)
 - Products include `categoryId`, `categoryName`, `subcategoryId` and `subcategoryName`; subcategory fields may be `null`.
@@ -126,10 +134,10 @@ UTF-8 `application/json` body. Send header labels separately from the data rows:
 
 ```json
 {
-  "headers": ["Product", "Price", "In stock"],
+  "headers": ["Product", "Price"],
   "rows": [
-    ["Blue mug", 12.5, true],
-    ["Plate", null, false]
+    ["Blue mug", 12.5],
+    ["Plate", null]
   ]
 }
 ```

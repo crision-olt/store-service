@@ -1,4 +1,4 @@
-const SORTABLE_COLUMNS = ['id', 'name', 'sku', 'category', 'subcategory', 'price', 'stock', 'created_at'];
+const SORTABLE_COLUMNS = ['id', 'name', 'sku', 'category', 'subcategory', 'price', 'created_at'];
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PRICE = 99999999.99;
@@ -8,10 +8,10 @@ const PRODUCT_COLUMNS = `id, name, description, sku,
   (SELECT name FROM categories WHERE id = products.category_id) AS "categoryName",
   subcategory_id AS "subcategoryId",
   (SELECT name FROM subcategories WHERE id = products.subcategory_id) AS "subcategoryName",
-  price, stock, created_at`;
+  price, created_at`;
 
 const LIST_PARAMS = [
-  'search', 'category', 'subcategory', 'minPrice', 'maxPrice', 'inStock', 'sortBy', 'sortOrder', 'page', 'pageSize'
+  'search', 'category', 'subcategory', 'minPrice', 'maxPrice', 'sortBy', 'sortOrder', 'page', 'pageSize'
 ];
 
 const first = (value) => (Array.isArray(value) ? value[0] : value);
@@ -43,7 +43,6 @@ const parseListQuery = (query = {}) => {
     subcategory: undefined,
     minPrice: undefined,
     maxPrice: undefined,
-    inStock: undefined,
     sortBy: 'created_at',
     sortOrder: 'desc',
     page: 1,
@@ -90,14 +89,6 @@ const parseListQuery = (query = {}) => {
     filters.minPrice > filters.maxPrice
   ) {
     return { error: 'minPrice cannot be greater than maxPrice' };
-  }
-
-  const inStock = first(query.inStock);
-  if (inStock !== undefined && inStock !== '') {
-    if (inStock !== 'true' && inStock !== 'false') {
-      return { error: 'inStock must be "true" or "false"' };
-    }
-    filters.inStock = inStock === 'true';
   }
 
   const sortBy = first(query.sortBy);
@@ -158,8 +149,6 @@ const buildListQuery = (filters) => {
   }
   if (filters.minPrice !== undefined) conditions.push(`price >= ${param(filters.minPrice)}`);
   if (filters.maxPrice !== undefined) conditions.push(`price <= ${param(filters.maxPrice)}`);
-  if (filters.inStock === true) conditions.push('stock > 0');
-  if (filters.inStock === false) conditions.push('stock = 0');
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const direction = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';
@@ -234,12 +223,6 @@ const parseProductInput = (body) => {
     return { error: 'price must have at most 2 decimal places' };
   }
   product.price = price;
-
-  const stock = body.stock === undefined ? 0 : body.stock;
-  if (!Number.isInteger(stock) || stock < 0 || stock > 2147483647) {
-    return { error: 'stock must be a non-negative integer' };
-  }
-  product.stock = stock;
 
   return { product };
 };

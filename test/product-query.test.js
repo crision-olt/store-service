@@ -24,7 +24,6 @@ test('list query combines every filter with parameterized values', () => {
     subcategory: '2',
     minPrice: '5',
     maxPrice: '20.5',
-    inStock: 'true',
     sortBy: 'price',
     sortOrder: 'asc',
     page: '3',
@@ -33,7 +32,7 @@ test('list query combines every filter with parameterized values', () => {
   assert.match(rows.text, /WHERE archived_at IS NULL AND \(name ILIKE \$1 OR sku ILIKE \$1 OR description ILIKE \$1\)/);
   assert.match(
     rows.text,
-    /category_id = \$2 AND subcategory_id = \$3 AND price >= \$4 AND price <= \$5 AND stock > 0/
+    /category_id = \$2 AND subcategory_id = \$3 AND price >= \$4 AND price <= \$5/
   );
   assert.match(rows.text, /ORDER BY price ASC, id ASC LIMIT \$6 OFFSET \$7$/);
   assert.deepEqual(rows.values, ['%50\\%\\_off%', 1, 2, 5, 20.5, 25, 50]);
@@ -50,10 +49,6 @@ test('list query supports multiple category and subcategory IDs', () => {
   assert.deepEqual(count.values, [1, 3, 2, 4]);
 });
 
-test('inStock=false only matches products without stock', () => {
-  assert.match(build({ inStock: 'false' }).rows.text, /stock = 0/);
-});
-
 test('list query rejects invalid input', () => {
   for (const query of [
     { sortBy: 'price; DROP TABLE products' },
@@ -61,7 +56,7 @@ test('list query rejects invalid input', () => {
     { minPrice: '-1' },
     { maxPrice: 'abc' },
     { minPrice: '10', maxPrice: '5' },
-    { inStock: 'maybe' },
+    { sortBy: 'stock' },
     { page: '0' },
     { pageSize: '101' },
     { pageSize: '1.5' },
@@ -74,7 +69,7 @@ test('list query rejects invalid input', () => {
   }
 });
 
-test('product input is trimmed and defaults stock to 0', () => {
+test('product input is trimmed and defaults optional fields to null', () => {
   const { product, error } = parseProductInput({
     name: '  Mug ',
     sku: 'MUG-1',
@@ -88,8 +83,7 @@ test('product input is trimmed and defaults stock to 0', () => {
     categoryId: 1,
     subcategoryId: null,
     description: null,
-    price: 9.99,
-    stock: 0
+    price: 9.99
   });
 });
 
@@ -100,7 +94,7 @@ test('product input accepts an optional subcategory ID', () => {
 });
 
 test('product input rejects invalid payloads', () => {
-  const valid = { name: 'Mug', sku: 'MUG-1', categoryId: 1, price: 9.99, stock: 1 };
+  const valid = { name: 'Mug', sku: 'MUG-1', categoryId: 1, price: 9.99 };
   for (const override of [
     { name: '' },
     { sku: undefined },
@@ -111,8 +105,6 @@ test('product input rejects invalid payloads', () => {
     { price: '9.99' },
     { price: -1 },
     { price: 1.005 },
-    { stock: 1.5 },
-    { stock: -1 },
     { description: 42 }
   ]) {
     assert.ok(parseProductInput({ ...valid, ...override }).error, JSON.stringify(override));

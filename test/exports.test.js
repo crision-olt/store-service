@@ -100,7 +100,7 @@ test('streams authenticated JSON rows into an Excel download', { timeout: 30000 
 
   await t.test('separates styled headers from banded data while preserving cell types and positions', async () => {
     const response = await post(JSON.stringify({
-      headers: ['Product', 'Price', 'In stock'],
+      headers: ['Product', 'Price', 'Featured'],
       rows: [['Mug', 12.5, true], ['Plate', null, false]]
     }));
     assert.equal(response.status, 200);
@@ -108,7 +108,7 @@ test('streams authenticated JSON rows into an Excel download', { timeout: 30000 
     const xml = strFromU8(files['xl/worksheets/sheet1.xml']);
     const styles = strFromU8(files['xl/styles.xml']);
     assert.match(xml, /<c r="A1" t="inlineStr" s="1">.*?Product/s);
-    assert.match(xml, /<c r="C1" t="inlineStr" s="1">.*?In stock/s);
+    assert.match(xml, /<c r="C1" t="inlineStr" s="1">.*?Featured/s);
     assert.match(xml, /<c r="B2" t="n"><v>12\.5<\/v>/);
     assert.match(xml, /<c r="C2" t="b"><v>1<\/v>/);
     assert.match(xml, /<c r="A3" t="inlineStr" s="2">.*?Plate/s);

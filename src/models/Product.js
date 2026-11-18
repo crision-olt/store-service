@@ -5,13 +5,13 @@ const { buildListQuery, PRODUCT_COLUMNS } = require('../utils/product-query');
 const toProduct = (row) => (row ? { ...row, price: Number(row.price) } : row);
 
 class Product {
-  static async create({ name, description, sku, categoryId, subcategoryId, price, stock }) {
+  static async create({ name, description, sku, categoryId, subcategoryId, price }) {
     const result = await pool.query(
       `WITH products AS (
-        INSERT INTO products (name, description, sku, category_id, subcategory_id, price, stock)
-        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+        INSERT INTO products (name, description, sku, category_id, subcategory_id, price)
+        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
       ) SELECT ${PRODUCT_COLUMNS} FROM products`,
-      [name, description, sku, categoryId, subcategoryId, price, stock]
+      [name, description, sku, categoryId, subcategoryId, price]
     );
     return toProduct(result.rows[0]);
   }
@@ -21,15 +21,15 @@ class Product {
     return toProduct(result.rows[0]);
   }
 
-  static async update(id, { name, description, sku, categoryId, subcategoryId, price, stock }) {
+  static async update(id, { name, description, sku, categoryId, subcategoryId, price }) {
     const result = await pool.query(
       `WITH products AS (
         UPDATE products
         SET name = $2, description = $3, sku = $4, category_id = $5,
-            subcategory_id = $6, price = $7, stock = $8
+            subcategory_id = $6, price = $7
         WHERE id = $1 AND archived_at IS NULL RETURNING *
       ) SELECT ${PRODUCT_COLUMNS} FROM products`,
-      [id, name, description, sku, categoryId, subcategoryId, price, stock]
+      [id, name, description, sku, categoryId, subcategoryId, price]
     );
     return toProduct(result.rows[0]);
   }
