@@ -110,12 +110,17 @@ count; reload before confirming a new resize.
 ### Restaurant zones setup
 
 Run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/zones.sql` after `sql/tables.sql`
-and before deploying the Zones API. The migration is repeatable and leaves
-existing tables unassigned.
+and before deploying the Zones API. Existing installations must rerun the
+migration to add base-zone support. It preserves current table assignments;
+existing zones are not marked as base by default.
 
 Authenticated clients can list zones with `GET /zones`, create them with
 `POST /zones`, and edit them with `PUT /zones/:id`. The write payload is
-`{ "name": "Patio", "hasOutside": true, "tableNumbers": [1, 2] }`.
+`{ "name": "Patio", "hasOutside": true, "tableNumbers": [1, 2], "isBase": true }`.
+Setting `isBase` to `true` replaces the previous base zone without changing its
+table assignments. Setting it to `false` clears the designation for the zone
+being edited. Omitting it leaves the designation unchanged on edit and defaults
+to `false` on creation.
 The list of table numbers replaces the previous assignment on edit; use `[]` for
 an empty zone. Tables can belong to only one zone. Outdoor tables must be
 removed from a zone before its outdoor area is disabled. Resizing the table

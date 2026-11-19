@@ -37,7 +37,7 @@ test('creates and edits zones with exclusive table assignments and outdoor eligi
   assert.equal((await fetch(`${url}/zones`)).status, 401);
   const created = await call('POST', '/zones', indoor);
   assert.equal(created.status, 201);
-  assert.deepEqual(created.body, { id: created.body.id, ...indoor });
+  assert.deepEqual(created.body, { id: created.body.id, ...indoor, isBase: false });
   assert.equal((await call('POST', '/zones', { ...indoor, tableNumbers: [2] })).status, 400);
   assert.equal((await call('POST', '/zones', { ...mixed, tableNumbers: [1, 2] })).status, 409);
   assert.equal((await call('POST', '/zones', { ...mixed, tableNumbers: [4] })).status, 409);
@@ -47,15 +47,26 @@ test('creates and edits zones with exclusive table assignments and outdoor eligi
   assert.equal((await call('PUT', mixedPath, { ...mixed, hasOutside: false })).status, 400);
   assert.deepEqual((await call('GET', '/zones')).body, [created.body, second.body]);
 
-  const updated = { id: second.body.id, name: 'Gallery', hasOutside: false, tableNumbers: [3] };
+  const updated = { id: second.body.id, name: 'Gallery', hasOutside: false, tableNumbers: [3], isBase: true };
   assert.deepEqual(await call('PUT', mixedPath, updated), { status: 200, body: updated });
-  const terrace = await call('POST', '/zones', { name: 'Terrace', hasOutside: true, tableNumbers: [2] });
+  assert.equal((await call('PUT', mixedPath, { ...updated, isBase: 'false' })).status, 400);
+  assert.deepEqual((await call('PUT', mixedPath, { ...mixed, tableNumbers: [3], hasOutside: false })).body, updated);
+  assert.equal((await call('POST', '/zones', { ...mixed, tableNumbers: [3], isBase: true })).status, 409);
+  assert.deepEqual((await call('GET', '/zones')).body, [created.body, updated]);
+  const terrace = await call('POST', '/zones', { name: 'Terrace', hasOutside: true, tableNumbers: [2], isBase: true });
   assert.equal(terrace.status, 201);
+  assert.equal(terrace.body.isBase, true);
+  await assert.rejects(db.query('UPDATE restaurant_zones SET is_base = true WHERE id = $1', [created.body.id]), { code: '23505' });
+  const promoted = await call('PUT', `/zones/${created.body.id}`, { ...indoor, isBase: true });
+  assert.deepEqual(promoted.body, { ...created.body, isBase: true });
   const tableSettings = { capacity: 4, isOutside: true, isAccessible: false };
   assert.equal((await call('PUT', '/tables/1', tableSettings)).status, 409);
   assert.deepEqual(await call('PUT', '/tables/1', { ...tableSettings, isOutside: false }), {
     status: 200, body: { number: 1, ...tableSettings, isOutside: false },
   });
   assert.equal((await call('PUT', '/tables', { count: 2, expectedCount: 3 })).status, 200);
-  assert.deepEqual((await call('GET', '/zones')).body, [created.body, { ...updated, tableNumbers: [] }, terrace.body]);
+  assert.deepEqual((await call('GET', '/zones')).body, [promoted.body, { ...updated, tableNumbers: [], isBase: false }, { ...terrace.body, isBase: false }]);
+  await db.exec(migration);
+  assert.deepEqual((await call('PUT', `/zones/${created.body.id}`, { ...indoor, isBase: false })).body, created.body);
+  assert.equal((await call('GET', '/zones')).body.some((zone) => zone.isBase), false);
 });

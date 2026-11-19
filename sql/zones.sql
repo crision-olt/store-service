@@ -25,4 +25,10 @@ BEGIN
   END IF;
 END $$;
 
+ALTER TABLE restaurant_zones
+  ADD COLUMN IF NOT EXISTS is_base BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE UNIQUE INDEX IF NOT EXISTS restaurant_zones_single_base_idx
+  ON restaurant_zones (is_base) WHERE is_base;
+
 COMMIT;
