@@ -18,6 +18,7 @@ Centralized authentication microservice for SSO across multiple applications.
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/allergens.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/product-allergens.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/offers.sql
+   psql -v ON_ERROR_STOP=1 auth_sso -f sql/discounts.sql
    ```
 
 3. **Configure environment:**
@@ -82,6 +83,12 @@ assigning any allergens to existing products and can be run again.
 Run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/offers.sql` after `sql/products.sql`
 and before deploying the Offers API. Rerun it on databases with existing offers
 to enable minimum-product promotions without changing saved offers.
+
+### Invoice-wide discounts setup
+
+Run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/discounts.sql` after `sql/init.sql`
+and before deploying the Discounts API. It creates discount definitions and their
+role assignments separately from offers; it can be run again on existing databases.
 
 ## API Endpoints
 
@@ -185,6 +192,22 @@ six eligible coffees and a minimum of four require four different coffees from
 that list; multiple units of the same coffee count as one. Omit the field or send
 `null` for a fixed bundle. This is configuration only; it does not apply
 discounts to table orders.
+
+### Invoice-wide discounts
+
+Discounts are separate from offers and do not have product IDs. All endpoints
+require a valid session cookie. `GET /discounts` lists definitions; use `POST
+/discounts` to create one or `PUT /discounts/:id` to replace it. Send
+`{ name, nameEs, kind, amount, roleIds }`. Both names are required, and `roleIds`
+must contain at least one distinct existing role ID. `kind` is `percentage`
+(greater than 0 and no greater than 100) or `fixed_amount` (in euros, greater than
+0); both amounts accept up to two decimals.
+
+These definitions are invoice-wide, independent of the products on an invoice.
+The current service does not yet have an invoice or discount-redemption endpoint,
+so it stores the discount and eligible roles but does not apply it to an invoice.
+Deleting a role removes its discount assignment; discounts must keep at least one
+eligible role when created or updated.
 
 ## Streaming Excel exports
 
