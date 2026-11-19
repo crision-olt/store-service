@@ -71,6 +71,9 @@ router.put('/:number', async (req, res, next) => {
     if (!rows[0]) return res.status(404).json({ error: 'Table not found' });
     return res.json(rows[0]);
   } catch (error) {
+    if (error.code === '23503' && error.constraint === 'restaurant_tables_outdoor_zone_fkey') {
+      return res.status(409).json({ error: 'The assigned zone does not allow outdoor tables' });
+    }
     next(error);
   }
 });

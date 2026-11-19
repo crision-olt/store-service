@@ -20,6 +20,7 @@ Centralized authentication microservice for SSO across multiple applications.
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/offers.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/discounts.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/tables.sql
+   psql -v ON_ERROR_STOP=1 auth_sso -f sql/zones.sql
    ```
 
 3. **Configure environment:**
@@ -105,6 +106,20 @@ reducing it permanently removes tables above the new count. New tables default t
 two seats, indoors, and not adapted. Capacity must be 2, 4, 6, or 8.
 The resize endpoint returns `409` if `expectedCount` differs from the current
 count; reload before confirming a new resize.
+
+### Restaurant zones setup
+
+Run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/zones.sql` after `sql/tables.sql`
+and before deploying the Zones API. The migration is repeatable and leaves
+existing tables unassigned.
+
+Authenticated clients can list zones with `GET /zones`, create them with
+`POST /zones`, and edit them with `PUT /zones/:id`. The write payload is
+`{ "name": "Patio", "hasOutside": true, "tableNumbers": [1, 2] }`.
+The list of table numbers replaces the previous assignment on edit; use `[]` for
+an empty zone. Tables can belong to only one zone. Outdoor tables must be
+removed from a zone before its outdoor area is disabled. Resizing the table
+count removes assignments for deleted tables.
 
 ## API Endpoints
 
