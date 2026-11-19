@@ -19,6 +19,7 @@ Centralized authentication microservice for SSO across multiple applications.
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/product-allergens.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/offers.sql
    psql -v ON_ERROR_STOP=1 auth_sso -f sql/discounts.sql
+   psql -v ON_ERROR_STOP=1 auth_sso -f sql/tables.sql
    ```
 
 3. **Configure environment:**
@@ -89,6 +90,21 @@ to enable minimum-product promotions without changing saved offers.
 Run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/discounts.sql` after `sql/init.sql`
 and before deploying the Discounts API. It creates discount definitions and their
 role assignments separately from offers; it can be run again on existing databases.
+
+### Restaurant tables setup
+
+Run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/tables.sql` before using restaurant
+table management. This repeatable script creates the table configuration without
+modifying existing data.
+
+Authenticated clients can use `GET /tables` to list tables, `PUT /tables` with
+`{ "count": 10, "expectedCount": 0 }` to set the total (1–50), and `PUT /tables/:number` with
+`{ "capacity": 4, "isOutside": false, "isAccessible": true }` to edit a table.
+Numbers are consecutive from 1. Increasing the count preserves existing settings;
+reducing it permanently removes tables above the new count. New tables default to
+two seats, indoors, and not adapted. Capacity must be 2, 4, 6, or 8.
+The resize endpoint returns `409` if `expectedCount` differs from the current
+count; reload before confirming a new resize.
 
 ## API Endpoints
 

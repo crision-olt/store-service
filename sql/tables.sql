@@ -1,0 +1,10 @@
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS restaurant_tables (
+  number INTEGER PRIMARY KEY CHECK (number BETWEEN 1 AND 50),
+  capacity INTEGER NOT NULL DEFAULT 2 CHECK (capacity IN (2, 4, 6, 8)),
+  is_outside BOOLEAN NOT NULL DEFAULT FALSE,
+  is_accessible BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+COMMIT;
