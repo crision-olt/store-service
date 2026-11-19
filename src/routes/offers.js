@@ -6,8 +6,9 @@ const router = express.Router();
 router.use(authenticateToken);
 
 const isId = (id) => Number.isInteger(id) && id > 0 && id <= 2147483647;
-const toOffer = ({ minimum_distinct_products, ...row }) => ({
+const toOffer = ({ minimum_distinct_products, name_es, ...row }) => ({
   ...row,
+  nameEs: row.nameEs ?? name_es ?? null,
   amount: Number(row.amount),
   ...(minimum_distinct_products === null ? {} : { minimumDistinctProducts: minimum_distinct_products })
 });
@@ -15,7 +16,7 @@ const toOffer = ({ minimum_distinct_products, ...row }) => ({
 router.get('/', async (req, res, next) => {
   try {
     const { rows } = await pool.query(`
-      SELECT id, name, kind, amount, minimum_distinct_products,
+      SELECT id, name, name_es AS "nameEs", kind, amount, minimum_distinct_products,
         ARRAY(SELECT product_id FROM offer_products WHERE offer_id = offers.id ORDER BY product_id) AS "productIds"
       FROM offers ORDER BY id DESC
     `);
@@ -26,7 +27,7 @@ router.get('/', async (req, res, next) => {
 });
 
 async function save(req, res, next) {
-  const { name, kind, amount, productIds, minimumDistinctProducts = null } = req.body ?? {};
+  const { name, nameEs, kind, amount, productIds, minimumDistinctProducts = null } = req.body ?? {};
   const editing = req.params.id !== undefined;
   const id = Number(req.params.id);
   if (editing && (!/^\d+$/.test(req.params.id) || !isId(id))) {
@@ -34,6 +35,9 @@ async function save(req, res, next) {
   }
   if (typeof name !== 'string' || name.trim().length === 0 || name.trim().length > 100) {
     return res.status(400).json({ error: 'Name must contain 1 to 100 characters' });
+  }
+  if (typeof nameEs !== 'string' || nameEs.trim().length === 0 || nameEs.trim().length > 100) {
+    return res.status(400).json({ error: 'Spanish name must contain 1 to 100 characters' });
   }
   if (kind !== 'menu' && kind !== 'promotion') {
     return res.status(400).json({ error: 'Kind must be menu or promotion' });
@@ -55,14 +59,14 @@ async function save(req, res, next) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const values = [name.trim(), kind, amount, minimumDistinctProducts];
+      const values = [name.trim(), nameEs.trim(), kind, amount, minimumDistinctProducts];
       const { rows: [offer] } = editing
         ? await client.query(
-          'UPDATE offers SET name = $1, kind = $2, amount = $3, minimum_distinct_products = $4 WHERE id = $5 RETURNING *',
+          'UPDATE offers SET name = $1, name_es = $2, kind = $3, amount = $4, minimum_distinct_products = $5 WHERE id = $6 RETURNING *',
           [...values, id]
         )
         : await client.query(
-          'INSERT INTO offers (name, kind, amount, minimum_distinct_products) VALUES ($1, $2, $3, $4) RETURNING *',
+          'INSERT INTO offers (name, name_es, kind, amount, minimum_distinct_products) VALUES ($1, $2, $3, $4, $5) RETURNING *',
           values
         );
       if (!offer) {

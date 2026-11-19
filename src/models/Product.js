@@ -34,11 +34,11 @@ async function saveProduct(sql, params, allergenIds) {
 }
 
 class Product {
-  static async create({ name, description, sku, categoryId, subcategoryId, price, allergenIds }) {
+  static async create({ name, nameEs, description, sku, categoryId, subcategoryId, price, allergenIds }) {
     return saveProduct(
-      `INSERT INTO products (name, description, sku, category_id, subcategory_id, price)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [name, description, sku, categoryId, subcategoryId, price],
+      `INSERT INTO products (name, name_es, description, sku, category_id, subcategory_id, price)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [name, nameEs, description, sku, categoryId, subcategoryId, price],
       allergenIds
     );
   }
@@ -48,12 +48,12 @@ class Product {
     return toProduct(result.rows[0]);
   }
 
-  static async update(id, { name, description, sku, categoryId, subcategoryId, price, allergenIds }) {
+  static async update(id, { name, nameEs, description, sku, categoryId, subcategoryId, price, allergenIds }) {
     return saveProduct(
       `UPDATE products
-       SET name = $2, description = $3, sku = $4, category_id = $5, subcategory_id = $6, price = $7
+       SET name = $2, name_es = $3, description = $4, sku = $5, category_id = $6, subcategory_id = $7, price = $8
        WHERE id = $1 AND archived_at IS NULL RETURNING id`,
-      [id, name, description, sku, categoryId, subcategoryId, price],
+      [id, name, nameEs, description, sku, categoryId, subcategoryId, price],
       allergenIds
     );
   }
@@ -83,29 +83,48 @@ class Product {
   static async findSubcategories(categoryId) {
     const result = categoryId
       ? await pool.query(
-          'SELECT id, name, category_id AS "categoryId" FROM subcategories WHERE category_id = $1 ORDER BY name, id',
+          'SELECT id, name, name_es AS "nameEs", category_id AS "categoryId" FROM subcategories WHERE category_id = $1 ORDER BY name, id',
           [categoryId]
         )
       : await pool.query(
-          'SELECT id, name, category_id AS "categoryId" FROM subcategories ORDER BY name, id'
+          'SELECT id, name, name_es AS "nameEs", category_id AS "categoryId" FROM subcategories ORDER BY name, id'
         );
     return result.rows;
   }
 
   static async findCategories() {
-    const result = await pool.query('SELECT id, name FROM categories ORDER BY name, id');
+    const result = await pool.query('SELECT id, name, name_es AS "nameEs" FROM categories ORDER BY name, id');
     return result.rows;
   }
 
-  static async createCategory(name) {
-    const result = await pool.query('INSERT INTO categories (name) VALUES ($1) RETURNING id, name', [name]);
+  static async createCategory(name, nameEs) {
+    const result = await pool.query(
+      'INSERT INTO categories (name, name_es) VALUES ($1, $2) RETURNING id, name, name_es AS "nameEs"',
+      [name, nameEs]
+    );
     return result.rows[0];
   }
 
-  static async createSubcategory(name, categoryId) {
+  static async updateCategory(id, name, nameEs) {
     const result = await pool.query(
-      'INSERT INTO subcategories (name, category_id) VALUES ($1, $2) RETURNING id, name, category_id AS "categoryId"',
-      [name, categoryId]
+      'UPDATE categories SET name = $2, name_es = $3 WHERE id = $1 RETURNING id, name, name_es AS "nameEs"',
+      [id, name, nameEs]
+    );
+    return result.rows[0];
+  }
+
+  static async createSubcategory(name, nameEs, categoryId) {
+    const result = await pool.query(
+      'INSERT INTO subcategories (name, name_es, category_id) VALUES ($1, $2, $3) RETURNING id, name, name_es AS "nameEs", category_id AS "categoryId"',
+      [name, nameEs, categoryId]
+    );
+    return result.rows[0];
+  }
+
+  static async updateSubcategory(id, name, nameEs) {
+    const result = await pool.query(
+      'UPDATE subcategories SET name = $2, name_es = $3 WHERE id = $1 RETURNING id, name, name_es AS "nameEs", category_id AS "categoryId"',
+      [id, name, nameEs]
     );
     return result.rows[0];
   }

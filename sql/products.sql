@@ -2,13 +2,15 @@ BEGIN;
 
 CREATE TABLE categories (
   id SERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE
+  name VARCHAR(100) NOT NULL UNIQUE,
+  name_es VARCHAR(100)
 );
 
 CREATE TABLE subcategories (
   id SERIAL PRIMARY KEY,
   category_id INTEGER NOT NULL REFERENCES categories(id),
   name VARCHAR(100) NOT NULL,
+  name_es VARCHAR(100),
   UNIQUE (category_id, name),
   UNIQUE (id, category_id)
 );
@@ -16,6 +18,7 @@ CREATE TABLE subcategories (
 CREATE TABLE products (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  name_es VARCHAR(255),
   description TEXT,
   sku VARCHAR(64) UNIQUE NOT NULL,
   category_id INTEGER NOT NULL,

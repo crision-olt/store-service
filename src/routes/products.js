@@ -10,11 +10,13 @@ const UNIQUE_VIOLATION = '23505';
 const FOREIGN_KEY_VIOLATION = '23503';
 const isId = (value) => Number.isInteger(value) && value > 0 && value <= 2147483647;
 
-const parseName = (body) => {
-  if (!body || typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 100) {
+const parseNames = (body) => {
+  if (!body || ['name', 'nameEs'].some((field) =>
+    typeof body[field] !== 'string' || !body[field].trim() || body[field].trim().length > 100
+  )) {
     return null;
   }
-  return body.name.trim();
+  return { name: body.name.trim(), nameEs: body.nameEs.trim() };
 };
 
 // Create product
@@ -68,14 +70,31 @@ router.get('/categories', async (req, res) => {
 });
 
 router.post('/categories', async (req, res) => {
-  const name = parseName(req.body);
-  if (!name) return res.status(400).json({ error: 'name must be a non-empty string of at most 100 characters' });
+  const names = parseNames(req.body);
+  if (!names) return res.status(400).json({ error: 'name and nameEs must be non-empty strings of at most 100 characters' });
   try {
-    res.status(201).json(await Product.createCategory(name));
+    res.status(201).json(await Product.createCategory(names.name, names.nameEs));
   } catch (err) {
     if (err.code === UNIQUE_VIOLATION) return res.status(409).json({ error: 'Category already exists' });
     console.error('Create category error:', err);
     res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+router.put('/categories/:id', async (req, res) => {
+  if (!/^\d+$/.test(req.params.id) || !isId(Number(req.params.id))) {
+    return res.status(400).json({ error: 'Category id must be a positive integer' });
+  }
+  const names = parseNames(req.body);
+  if (!names) return res.status(400).json({ error: 'name and nameEs must be non-empty strings of at most 100 characters' });
+  try {
+    const category = await Product.updateCategory(Number(req.params.id), names.name, names.nameEs);
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+    res.status(200).json(category);
+  } catch (err) {
+    if (err.code === UNIQUE_VIOLATION) return res.status(409).json({ error: 'Category already exists' });
+    console.error('Update category error:', err);
+    res.status(500).json({ error: 'Failed to update category' });
   }
 });
 
@@ -94,16 +113,33 @@ router.get('/subcategories', async (req, res) => {
 });
 
 router.post('/subcategories', async (req, res) => {
-  const name = parseName(req.body);
-  if (!name) return res.status(400).json({ error: 'name must be a non-empty string of at most 100 characters' });
+  const names = parseNames(req.body);
+  if (!names) return res.status(400).json({ error: 'name and nameEs must be non-empty strings of at most 100 characters' });
   if (!isId(req.body.categoryId)) return res.status(400).json({ error: 'categoryId must be a positive integer ID' });
   try {
-    res.status(201).json(await Product.createSubcategory(name, req.body.categoryId));
+    res.status(201).json(await Product.createSubcategory(names.name, names.nameEs, req.body.categoryId));
   } catch (err) {
     if (err.code === UNIQUE_VIOLATION) return res.status(409).json({ error: 'Subcategory already exists in this category' });
     if (err.code === FOREIGN_KEY_VIOLATION) return res.status(400).json({ error: 'Category does not exist' });
     console.error('Create subcategory error:', err);
     res.status(500).json({ error: 'Failed to create subcategory' });
+  }
+});
+
+router.put('/subcategories/:id', async (req, res) => {
+  if (!/^\d+$/.test(req.params.id) || !isId(Number(req.params.id))) {
+    return res.status(400).json({ error: 'Subcategory id must be a positive integer' });
+  }
+  const names = parseNames(req.body);
+  if (!names) return res.status(400).json({ error: 'name and nameEs must be non-empty strings of at most 100 characters' });
+  try {
+    const subcategory = await Product.updateSubcategory(Number(req.params.id), names.name, names.nameEs);
+    if (!subcategory) return res.status(404).json({ error: 'Subcategory not found' });
+    res.status(200).json(subcategory);
+  } catch (err) {
+    if (err.code === UNIQUE_VIOLATION) return res.status(409).json({ error: 'Subcategory already exists in this category' });
+    console.error('Update subcategory error:', err);
+    res.status(500).json({ error: 'Failed to update subcategory' });
   }
 });
 

@@ -16,8 +16,9 @@ test('edits products through the API and leaves rejected updates unchanged', asy
   }
   await db.exec(`
     INSERT INTO users (email, password, role_id) VALUES ('editor@example.com', 'x', 1);
-    INSERT INTO categories (name) VALUES ('Kitchen'), ('Office');
-    INSERT INTO subcategories (category_id, name) VALUES (1, 'Mugs'), (2, 'Pens');
+    INSERT INTO categories (name, name_es) VALUES ('Kitchen', 'Cocina'), ('Office', 'Oficina');
+    INSERT INTO subcategories (category_id, name, name_es)
+    VALUES (1, 'Mugs', 'Tazas'), (2, 'Pens', 'Plumas');
   `);
   const databasePath = require.resolve('../src/config/database');
   require.cache[databasePath] = {
@@ -48,7 +49,7 @@ test('edits products through the API and leaves rejected updates unchanged', asy
     return { status: response.status, body: response.status === 204 ? null : await response.json() };
   };
   const original = {
-    name: 'Mug', sku: 'MUG-1', description: 'Original', categoryId: 1,
+    name: 'Mug', nameEs: 'Taza', sku: 'MUG-1', description: 'Original', categoryId: 1,
     subcategoryId: 1, price: 9.99
   };
   const created = await call('POST', '', original);
@@ -72,14 +73,14 @@ test('edits products through the API and leaves rejected updates unchanged', asy
   assert.deepEqual((await call('PUT', allergenicPath, { ...original, sku: 'ALLERGEN-1', allergenIds: [] })).body.allergenIds, []);
   assert.equal((await call('POST', `${allergenicPath}/archive`)).status, 204);
   const input = {
-    name: ' New pen ', sku: ' PEN-1 ', description: ' Updated ', categoryId: 2,
+    name: ' New pen ', nameEs: ' Pluma nueva ', sku: ' PEN-1 ', description: ' Updated ', categoryId: 2,
     subcategoryId: 2, price: 0
   };
   let response = await call('PUT', `/${id}`, input);
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, {
-    ...created.body, ...input, name: 'New pen', sku: 'PEN-1', description: 'Updated',
-    categoryName: 'Office', subcategoryName: 'Pens'
+    ...created.body, ...input, name: 'New pen', nameEs: 'Pluma nueva', sku: 'PEN-1', description: 'Updated',
+    categoryName: 'Office', categoryNameEs: 'Oficina', subcategoryName: 'Pens', subcategoryNameEs: 'Plumas'
   });
   assert.deepEqual((await call('GET', `/${id}`)).body, response.body);
   assert.deepEqual((await call('GET', `/${other.body.id}`)).body, other.body);
@@ -91,6 +92,7 @@ test('edits products through the API and leaves rejected updates unchanged', asy
     [`/${id}`, { ...input, subcategoryId: 1 }, 400],
     [`/${id}`, { ...input, categoryId: 999, subcategoryId: null }, 400],
     [`/${id}`, { ...input, name: ' ' }, 400],
+    [`/${id}`, { ...input, nameEs: ' ' }, 400],
     [`/${id}`, { ...input, price: 1.001 }, 400],
     ['/0', input, 400],
     ['/abc', input, 400],
@@ -109,9 +111,10 @@ test('edits products through the API and leaves rejected updates unchanged', asy
   assert.equal(response.status, 200);
   assert.equal(response.body.subcategoryId, null);
   assert.equal(response.body.subcategoryName, null);
+  assert.equal(response.body.subcategoryNameEs, null);
   assert.equal(response.body.description, null);
   assert.equal(response.body.created_at, created.body.created_at);
-  const list = await call('GET', '?search=pen');
+  const list = await call('GET', '?search=pluma');
   assert.equal(list.status, 200);
   assert.deepEqual(list.body.data, [response.body]);
 

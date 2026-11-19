@@ -37,10 +37,13 @@ test('creates and edits fixed bundles without partially saving an invalid select
     return { status: response.status, body: await response.json() };
   };
   assert.equal((await fetch(url)).status, 401);
-  const menu = { name: 'Lunch menu', kind: 'menu', amount: 12.5, productIds: [1, 2] };
+  const menu = { name: 'Lunch menu', nameEs: 'Menú del día', kind: 'menu', amount: 12.5, productIds: [1, 2] };
   const created = await call('POST', '', menu);
   assert.deepEqual(created, { status: 201, body: { id: 1, ...menu } });
-  const promo = { ...menu, name: 'Lunch deal', kind: 'promotion', amount: 10 };
+  const { nameEs: _nameEs, ...englishOnly } = menu;
+  assert.equal((await call('POST', '', englishOnly)).status, 400);
+  assert.deepEqual((await call('GET')).body, [created.body]);
+  const promo = { ...menu, name: 'Lunch deal', nameEs: 'Oferta de almuerzo', kind: 'promotion', amount: 10 };
   for (const override of [{ productIds: [1, 3] }, { productIds: [1, 99] }, { productIds: [1, 1] }, { amount: 101 }, { amount: 1.005 }]) {
     assert.equal((await call('PUT', '/1', { ...promo, ...override })).status, 400);
     assert.deepEqual((await call('GET')).body, [created.body]);

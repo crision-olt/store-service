@@ -29,7 +29,7 @@ test('list query combines every filter with parameterized values', () => {
     page: '3',
     pageSize: '25'
   });
-  assert.match(rows.text, /WHERE archived_at IS NULL AND \(name ILIKE \$1 OR sku ILIKE \$1 OR description ILIKE \$1\)/);
+  assert.match(rows.text, /WHERE archived_at IS NULL AND \(name ILIKE \$1 OR name_es ILIKE \$1 OR sku ILIKE \$1 OR description ILIKE \$1\)/);
   assert.match(
     rows.text,
     /category_id = \$2 AND subcategory_id = \$3 AND price >= \$4 AND price <= \$5/
@@ -72,6 +72,7 @@ test('list query rejects invalid input', () => {
 test('product input is trimmed and defaults optional fields to null', () => {
   const { product, error } = parseProductInput({
     name: '  Mug ',
+    nameEs: '  Taza ',
     sku: 'MUG-1',
     categoryId: 1,
     price: 9.99
@@ -79,6 +80,7 @@ test('product input is trimmed and defaults optional fields to null', () => {
   assert.equal(error, undefined);
   assert.deepEqual(product, {
     name: 'Mug',
+    nameEs: 'Taza',
     sku: 'MUG-1',
     categoryId: 1,
     subcategoryId: null,
@@ -88,15 +90,16 @@ test('product input is trimmed and defaults optional fields to null', () => {
 });
 
 test('product input accepts an optional subcategory ID', () => {
-  const input = { name: 'Mug', sku: 'MUG-1', categoryId: 1, price: 9.99 };
+  const input = { name: 'Mug', nameEs: 'Taza', sku: 'MUG-1', categoryId: 1, price: 9.99 };
   assert.equal(parseProductInput({ ...input, subcategoryId: 2 }).product.subcategoryId, 2);
   assert.equal(parseProductInput({ ...input, subcategoryId: null }).product.subcategoryId, null);
 });
 
 test('product input rejects invalid payloads', () => {
-  const valid = { name: 'Mug', sku: 'MUG-1', categoryId: 1, price: 9.99 };
+  const valid = { name: 'Mug', nameEs: 'Taza', sku: 'MUG-1', categoryId: 1, price: 9.99 };
   for (const override of [
     { name: '' },
+    { nameEs: ' ' },
     { sku: undefined },
     { categoryId: 0 },
     { categoryId: '1' },

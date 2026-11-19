@@ -4,10 +4,13 @@ const DEFAULT_PAGE_SIZE = 10;
 const MAX_PRICE = 99999999.99;
 const MAX_ID = 2147483647;
 const PRODUCT_COLUMNS = `id, name, description, sku,
+  name_es AS "nameEs",
   category_id AS "categoryId",
   (SELECT name FROM categories WHERE id = products.category_id) AS "categoryName",
+  (SELECT name_es FROM categories WHERE id = products.category_id) AS "categoryNameEs",
   subcategory_id AS "subcategoryId",
   (SELECT name FROM subcategories WHERE id = products.subcategory_id) AS "subcategoryName",
+  (SELECT name_es FROM subcategories WHERE id = products.subcategory_id) AS "subcategoryNameEs",
   price, created_at,
   ARRAY(SELECT allergen_id FROM product_allergens WHERE product_id = products.id ORDER BY allergen_id) AS "allergenIds"`;
 
@@ -137,7 +140,7 @@ const buildListQuery = (filters) => {
   if (filters.search) {
     const placeholder = param(`%${escapeLike(filters.search)}%`);
     conditions.push(
-      `(name ILIKE ${placeholder} OR sku ILIKE ${placeholder} OR description ILIKE ${placeholder})`
+      `(name ILIKE ${placeholder} OR name_es ILIKE ${placeholder} OR sku ILIKE ${placeholder} OR description ILIKE ${placeholder})`
     );
   }
   for (const name of ['category', 'subcategory']) {
@@ -190,7 +193,7 @@ const parseProductInput = (body) => {
   };
 
   const product = {};
-  for (const [field, maxLength] of [['name', 255], ['sku', 64]]) {
+  for (const [field, maxLength] of [['name', 255], ['nameEs', 255], ['sku', 64]]) {
     const result = requiredText(field, maxLength);
     if (result.error) return { error: result.error };
     product[field] = result.value;

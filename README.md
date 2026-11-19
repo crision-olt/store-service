@@ -54,6 +54,18 @@ psql -v ON_ERROR_STOP=1 auth_sso -f sql/products-remove-stock.sql
 This permanently removes stored stock values without deleting products. Back up
 the database first. New databases do not need this migration.
 
+### Bilingual catalog names
+
+On an existing database, run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/bilingual-names.sql`
+before deploying the bilingual naming API. It adds nullable Spanish-name columns to
+categories, subcategories, products, menus and promotions without changing existing
+names. Existing records without a Spanish value display their English name until
+translated in the frontend. New and edited names require both languages.
+
+New databases already include these columns in `sql/products.sql` and `sql/offers.sql`.
+For future named catalog entities, use `name` for English and `name_es` for Spanish;
+the JSON API uses `name` and `nameEs`.
+
 ### Allergen catalog setup
 
 On an existing database, run `psql -v ON_ERROR_STOP=1 auth_sso -f sql/allergens.sql`
@@ -128,7 +140,7 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
 
 ### Products (all require a valid JWT cookie)
 
-- `POST /products` - Create a product. JSON body: `name`, `sku` (unique), `categoryId`, `price` (max 2 decimals), optional `subcategoryId` and `description`. IDs must be positive integers, and the subcategory must belong to the category. Returns `400` for invalid references and `409` if the SKU exists.
+- `POST /products` - Create a product. JSON body: `name`, `nameEs`, `sku` (unique), `categoryId`, `price` (max 2 decimals), optional `subcategoryId` and `description`. Both names are required. IDs must be positive integers, and the subcategory must belong to the category. Returns `400` for invalid references and `409` if the SKU exists.
 - `PUT /products/:id` - Replace a product's editable fields using the same body and validation as creation. Returns the updated product, preserving its ID and creation date. Returns `400` for invalid input or references, `404` if missing, and `409` if another product uses the SKU. Omitted optional fields reset to their creation defaults; send the complete form to retain them.
 - `POST /products/:id/archive` - Archive a product without deleting its data. Returns `204`, including when already archived, `400` for an invalid ID, or `404` if missing. Archived products are excluded from listings and totals; fetching or editing one returns `404`. Their SKUs remain reserved. There is no restore endpoint yet.
 - `GET /products` - List products. Response: `{ data, total, page, pageSize }`. Query params (all optional):
@@ -139,14 +151,16 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
   - `sortBy` - `id`, `name`, `sku`, `category`, `subcategory`, `price` or `created_at` (default `created_at`)
   - `sortOrder` - `asc` or `desc` (default `desc`)
   - `page` (default `1`), `pageSize` (default `10`, max `100`)
-- Products include `categoryId`, `categoryName`, `subcategoryId` and `subcategoryName`; subcategory fields may be `null`.
+- Products include `nameEs`, `categoryId`, `categoryName`, `categoryNameEs`, `subcategoryId`, `subcategoryName` and `subcategoryNameEs`; Spanish names may be `null` on records created before bilingual naming was introduced, and subcategory fields may be `null`.
 - Product responses also include `allergenIds`. On create or edit, send an array of
   IDs from `GET /allergens`. On edit, `[]` clears the assignments; omitting the
   field preserves them. Invalid IDs reject the entire save.
-- `GET /products/categories` - List `{ id, name }` categories, including those without products.
-- `POST /products/categories` - Create a category with `{ "name": "Kitchen" }`.
-- `GET /products/subcategories` - List `{ id, name, categoryId }` subcategories, optionally limited by `?category=<id>`.
-- `POST /products/subcategories` - Create a subcategory with `{ "name": "Mugs", "categoryId": 1 }`.
+- `GET /products/categories` - List `{ id, name, nameEs }` categories, including those without products.
+- `POST /products/categories` - Create a category with `{ "name": "Kitchen", "nameEs": "Cocina" }`.
+- `PUT /products/categories/:id` - Replace both category names.
+- `GET /products/subcategories` - List `{ id, name, nameEs, categoryId }` subcategories, optionally limited by `?category=<id>`.
+- `POST /products/subcategories` - Create a subcategory with `{ "name": "Mugs", "nameEs": "Tazas", "categoryId": 1 }`.
+- `PUT /products/subcategories/:id` - Replace both subcategory names.
 - Creating duplicate category names, or duplicate subcategory names within the same category, returns `409`. A nonexistent parent category returns `400`.
 - `GET /products/:id` - Get a product by id (`404` if missing)
 
@@ -160,7 +174,7 @@ An unauthenticated request returns `401`. Look up permission IDs before assignin
 
 All offer endpoints require a valid session cookie. `GET /offers` lists saved
 configurations. Use `POST /offers` to create one or `PUT /offers/:id` to replace it.
-Send `{ name, kind, amount, productIds }`. A `menu` stores a fixed total price in
+Send `{ name, nameEs, kind, amount, productIds }`. Both names are required. A `menu` stores a fixed total price in
 euros; a `promotion` stores a percentage greater than 0 and no greater than 100.
 Both accept up to two decimals. A bundle contains each of its selected products
 once. Only active products can be saved in an offer.
