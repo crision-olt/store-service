@@ -171,9 +171,21 @@ any authenticated user can call them.
 
 Every authenticated request checks the database, so a blocked or deleted user's token stops
 working at once (`401`) even though the JWT itself has not expired. Databases created before
-this feature need `sql/users-blocked.sql` (adds `users.blocked_at`). Open streams are kept in
-memory, so instant sign-out works with one service instance; with several, the blocked user
-is still rejected on their next request.
+this feature need `sql/users-blocked.sql` (adds `users.blocked_at`).
+
+#### Session events (SSE)
+
+Authenticated clients receive instant sign-out notifications over Server-Sent Events (`GET /auth/events`) instead of waiting for the next API request to fail with `401`.
+
+1. The client opens `GET /auth/events` with its `token` cookie (`authenticateToken`).
+2. The server responds with `Content-Type: text/event-stream`, flushes `: connected`, and registers the stream in memory (`src/utils/sessions.js`), sending `: ping` every 25 seconds.
+3. When an administrator calls `PUT /users/:id/block`, `sessions.closeUser(id)` writes `event: blocked` with `data: {}` to every open stream for that user and closes them.
+
+| Requirement | Detail |
+|-------------|--------|
+| Authentication | Valid `token` cookie (`httpOnly`, `SameSite=Lax`); unauthenticated or blocked users receive `401`. |
+| Reverse proxies | Must not buffer or close idle SSE streams (`X-Accel-Buffering: no` is set on the response). |
+| Scaling | Open streams are stored in an in-memory `Map` per service instance; with multiple instances, blocked users still get `401` on their next request. |
 
 Protection (returns `409`): the `user` role (used by registration) cannot be renamed
 or deleted. Unknown IDs return `404`.
