@@ -26,15 +26,20 @@ Centralized authentication microservice for SSO across multiple applications.
 3. **Configure environment:**
    ```bash
    cp .env.example .env
-   # Edit .env with your PostgreSQL connection string and JWT_SECRET
+   # Set STORE_DB_CONNECTION and JWT_SECRET in .env
    ```
+   `AUTH_FRONTEND_URL` is the browser origin allowed by CORS (local Vite:
+   `http://localhost:5173`), not the API URL.
 
 4. **Start service:**
    ```bash
    npm start
    ```
 
-Service will run on http://localhost:3000
+The API listens on `http://localhost:3000` by default. In the
+frontend, set `AUTH_SERVICE_URL` to that origin
+or update it if you change `PORT`. Use the same hostname for both apps
+(`localhost`, not a mix of `localhost` and `127.0.0.1`) for the session cookie.
 
 ### Existing product databases
 
